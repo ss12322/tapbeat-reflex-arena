@@ -87,6 +87,9 @@ El pool crece automáticamente mientras la página está abierta.
 ```
 .
 ├── index.html          # Juego completo (HTML, CSS y JavaScript)
+├── supabase-config.js  # URL y anon key de Supabase
+├── supabase/
+│   └── schema.sql      # Tablas profiles y scores (ejecutar en Supabase)
 ├── sounds/
 │   └── tron-juego.wav  # Música de la pantalla Home
 └── README.md
@@ -94,25 +97,40 @@ El pool crece automáticamente mientras la página está abierta.
 
 ---
 
-## Ejecutar en local
+## Supabase (usuarios y leaderboard global)
 
-1. Clona el repositorio:
+El registro, login y leaderboard se guardan en [Supabase](https://supabase.com/dashboard/project/njaesbocsnfbfouogfpo).
 
-```bash
-git clone https://github.com/ss12322/tapbeat-reflex-arena.git
-cd tapbeat-reflex-arena
+### 1. Crear tablas
+
+En el dashboard → **SQL Editor**, ejecuta el contenido de `supabase/schema.sql`.
+
+### 2. Configurar la API key
+
+1. Ve a **Settings → API** en tu proyecto Supabase.
+2. Copia la **anon public** key.
+3. Pégala en `supabase-config.js`:
+
+```javascript
+window.TAPBEAT_SUPABASE = {
+  url: 'https://njaesbocsnfbfouogfpo.supabase.co',
+  anonKey: 'tu-anon-key-aqui'
+};
 ```
 
-2. Abre `index.html` en un navegador moderno, o sirve la carpeta con un servidor local:
+### 3. Auth (recomendado para desarrollo)
 
-```bash
-# Python 3
-python -m http.server 8080
-```
+En **Authentication → Providers → Email**, desactiva **Confirm email** para que el registro entre directo al juego sin confirmar correo.
 
-3. Visita `http://localhost:8080`.
+### Qué se guarda en el servidor
 
-> Se recomienda usar un servidor local en lugar de abrir el archivo directamente (`file://`) para que el audio cargue correctamente.
+| Tabla | Contenido |
+|-------|-----------|
+| `auth.users` | Email y contraseña (Supabase Auth) |
+| `profiles` | Nombre de usuario único + email |
+| `scores` | Mejor score y promedio de clicks por jugador |
+
+Todos los usuarios registrados comparten el mismo leaderboard global.
 
 ---
 
@@ -130,6 +148,21 @@ const CUSTOM_SOUNDS = {
 ```
 
 Coloca tus archivos en la carpeta `sounds/` y actualiza las rutas.
+
+---
+
+## Ejecutar en local
+
+1. Clona el repositorio y configura Supabase (ver arriba).
+2. Sirve la carpeta con un servidor local:
+
+```bash
+python -m http.server 8080
+```
+
+3. Visita `http://localhost:8080`.
+
+> Usa un servidor local (no `file://`) para que Supabase y el audio funcionen correctamente.
 
 ---
 

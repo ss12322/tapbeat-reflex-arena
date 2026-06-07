@@ -1752,6 +1752,11 @@
       transform: scale(0.97);
     }
 
+    .auth-submit:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
     .auth-switch {
       text-align: center;
       font-family: var(--font-mono);
@@ -1826,7 +1831,18 @@
           >
           <span class="auth-field-error" id="register-email-error"></span>
         </div>
-        <button type="submit" class="auth-submit">ENTRAR A LA ARENA</button>
+        <div class="auth-field">
+          <label class="auth-label" for="register-password">Contraseña</label>
+          <input
+            class="auth-input"
+            type="password"
+            id="register-password"
+            placeholder="••••••••"
+            autocomplete="new-password"
+          >
+          <span class="auth-field-error" id="register-password-error"></span>
+        </div>
+        <button type="submit" class="auth-submit" id="btn-register-submit">ENTRAR A LA ARENA</button>
       </form>
 
       <form class="auth-form is-hidden" id="login-form" novalidate>
@@ -1852,7 +1868,7 @@
           >
           <span class="auth-field-error" id="login-password-error"></span>
         </div>
-        <button type="submit" class="auth-submit">INICIAR SESIÓN</button>
+        <button type="submit" class="auth-submit" id="btn-login-submit">INICIAR SESIÓN</button>
       </form>
 
       <p class="auth-switch" id="auth-switch-register">
@@ -2112,6 +2128,8 @@
     <button onclick="showScreen('result-screen')" data-screen="result-screen">Result</button>
   </nav>
 
+  <script src="supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SCREENS = [
       'auth-screen',
@@ -2124,10 +2142,46 @@
 
     const STORAGE_USER = 'tapbeat_user';
     const STORAGE_EMAIL = 'tapbeat_email';
-    const STORAGE_PROFILE = 'tapbeat_profile';
-    const STORAGE_LEADERBOARD = 'tapbeat_leaderboard';
     const USERNAME_RE = /^[a-zA-Z0-9_]{3,}$/;
     const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    let supabaseClient = null;
+    let currentUserId = null;
+    let leaderboardCache = [];
+
+    function initSupabaseClient() {
+      const cfg = window.TAPBEAT_SUPABASE || {};
+      if (!cfg.url || !cfg.anonKey || cfg.anonKey === 'PEGAR_ANON_KEY_AQUI') {
+        console.warn('TapBeat: configura supabase-config.js con tu anon key');
+        return false;
+      }
+      if (typeof supabase === 'undefined') {
+        console.warn('TapBeat: Supabase JS no cargó');
+        return false;
+      }
+      supabaseClient = supabase.createClient(cfg.url, cfg.anonKey);
+      return true;
+    }
+
+    function mapSupabaseAuthError(error) {
+      const msg = (error && error.message) ? error.message.toLowerCase() : '';
+      if (msg.indexOf('invalid login credentials') !== -1) {
+        return 'Email o contraseña incorrectos';
+      }
+      if (msg.indexOf('user already registered') !== -1) {
+        return 'Este email ya está registrado';
+      }
+      if (msg.indexOf('duplicate key') !== -1 || msg.indexOf('profiles_username_key') !== -1) {
+        return 'Ese nombre de usuario ya está en uso';
+      }
+      if (msg.indexOf('password') !== -1 && msg.indexOf('short') !== -1) {
+        return 'La contraseña es demasiado corta';
+      }
+      if (msg.indexOf('email not confirmed') !== -1) {
+        return 'Confirma tu email antes de iniciar sesión';
+      }
+      return (error && error.message) ? error.message : 'Error de conexión con el servidor';
+    }
 
     function getStoredUser() {
       try {
@@ -2144,46 +2198,80 @@
       } catch (e) { /* file:// puede bloquear localStorage */ }
     }
 
-    function registerUserProfile(username, email) {
-      saveSession(username, email);
+    function clearSession() {
       try {
-        localStorage.setItem(STORAGE_PROFILE, JSON.stringify({
-          username: username,
-          email: email || '',
-          createdAt: Date.now()
-        }));
-      } catch (e) { /* file:// puede bloquear localStorage */ }
-
-      const entries = getLeaderboardEntries();
-      if (!entries.some(function (e) { return e.name === username; })) {
-        entries.push({
-          name: username,
-          score: 0,
-          avgTime: '—',
-          isPlayer: true,
-          hasPlayed: false
-        });
-        saveLeaderboardEntries(entries);
-      }
-      renderLeaderboard();
+        localStorage.removeItem(STORAGE_USER);
+        localStorage.removeItem(STORAGE_EMAIL);
+      } catch (e) { /* noop */ }
+      currentUserId = null;
     }
 
-    function ensureCurrentUserInLeaderboard() {
-      const username = getStoredUser();
-      if (!username) return;
+    async function fetchProfile(userId) {
+      if (!supabaseClient) return null;
+      const { data, error } = await supabaseClient
+        .from('profiles')
+        .select('username, email')
+        .eq('id', userId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    }
 
-      const entries = getLeaderboardEntries();
-      if (!entries.some(function (e) { return e.name === username; })) {
-        entries.push({
-          name: username,
-          score: 0,
-          avgTime: '—',
-          isPlayer: true,
-          hasPlayed: false
-        });
-        saveLeaderboardEntries(entries);
-        renderLeaderboard();
+    async function isUsernameAvailable(username) {
+      if (!supabaseClient) return true;
+      const { data, error } = await supabaseClient
+        .from('profiles')
+        .select('id')
+        .eq('username', username)
+        .maybeSingle();
+      if (error) throw error;
+      return !data;
+    }
+
+    async function registerWithSupabase(username, email, password) {
+      const available = await isUsernameAvailable(username);
+      if (!available) {
+        const err = new Error('username_taken');
+        err.code = 'username_taken';
+        throw err;
       }
+
+      const { data, error } = await supabaseClient.auth.signUp({
+        email: email,
+        password: password,
+        options: { data: { username: username } }
+      });
+      if (error) throw error;
+      return data;
+    }
+
+    async function loginWithSupabase(email, password) {
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email: email,
+        password: password
+      });
+      if (error) throw error;
+      return data;
+    }
+
+    async function getSupabaseSession() {
+      if (!supabaseClient) return null;
+      const { data, error } = await supabaseClient.auth.getSession();
+      if (error) throw error;
+      return data.session;
+    }
+
+    function setAuthLoading(isLoading) {
+      ['btn-register-submit', 'btn-login-submit'].forEach(function (id) {
+        const btn = document.getElementById(id);
+        if (btn) btn.disabled = isLoading;
+      });
+    }
+
+    function registerUserProfile(username, email, userId) {
+      saveSession(username, email);
+      if (userId) currentUserId = userId;
+      updateUserGreeting();
     }
 
     function updateUserGreeting() {
@@ -2232,6 +2320,12 @@
       return '';
     }
 
+    function validatePassword(value) {
+      if (!value) return 'La contraseña es obligatoria';
+      if (value.length <= 5) return 'La contraseña debe tener más de 5 caracteres';
+      return '';
+    }
+
     function showAuthForm(mode) {
       const isLogin = mode === 'login';
       document.getElementById('register-form').classList.toggle('is-hidden', isLogin);
@@ -2242,9 +2336,11 @@
       clearAuthErrors('login-form');
     }
 
-    function enterHomeFromAuth(username, email) {
-      registerUserProfile(username, email);
-      updateUserGreeting();
+    function enterHomeFromAuth(username, email, userId) {
+      registerUserProfile(username, email, userId);
+      refreshLeaderboardFromServer().then(function () {
+        renderLeaderboard();
+      });
 
       const authScreen = document.getElementById('auth-screen');
       const homeScreen = document.getElementById('home-screen');
@@ -2274,49 +2370,85 @@
         showAuthForm('register');
       });
 
-      document.getElementById('register-form').addEventListener('submit', function (e) {
+      document.getElementById('register-form').addEventListener('submit', async function (e) {
         e.preventDefault();
         clearAuthErrors('register-form');
 
+        if (!supabaseClient) {
+          setAuthFieldError('register-email', 'register-email-error', 'Servidor no configurado. Revisa supabase-config.js');
+          return;
+        }
+
         const username = document.getElementById('register-username').value.trim();
         const email = document.getElementById('register-email').value.trim();
+        const password = document.getElementById('register-password').value;
 
         const usernameError = validateUsername(username);
         const emailError = validateEmail(email);
+        const passwordError = validatePassword(password);
 
         if (usernameError) setAuthFieldError('register-username', 'register-username-error', usernameError);
         if (emailError) setAuthFieldError('register-email', 'register-email-error', emailError);
-        if (usernameError || emailError) return;
+        if (passwordError) setAuthFieldError('register-password', 'register-password-error', passwordError);
+        if (usernameError || emailError || passwordError) return;
 
-        enterHomeFromAuth(username, email);
+        setAuthLoading(true);
+        try {
+          const result = await registerWithSupabase(username, email, password);
+          if (result.session) {
+            enterHomeFromAuth(username, email, result.user.id);
+          } else {
+            setAuthFieldError(
+              'register-email',
+              'register-email-error',
+              'Cuenta creada. Revisa tu email para confirmar e inicia sesión.'
+            );
+            showAuthForm('login');
+          }
+        } catch (err) {
+          if (err.code === 'username_taken') {
+            setAuthFieldError('register-username', 'register-username-error', 'Ese nombre de usuario ya está en uso');
+          } else {
+            setAuthFieldError('register-email', 'register-email-error', mapSupabaseAuthError(err));
+          }
+        } finally {
+          setAuthLoading(false);
+        }
       });
 
-      document.getElementById('login-form').addEventListener('submit', function (e) {
+      document.getElementById('login-form').addEventListener('submit', async function (e) {
         e.preventDefault();
         clearAuthErrors('login-form');
+
+        if (!supabaseClient) {
+          setAuthFieldError('login-email', 'login-email-error', 'Servidor no configurado. Revisa supabase-config.js');
+          return;
+        }
 
         const email = document.getElementById('login-email').value.trim();
         const password = document.getElementById('login-password').value;
 
-        let hasError = false;
+        const emailError = !email || email.indexOf('@') === -1 ? 'Ingresa un email válido' : '';
+        const passwordError = validatePassword(password);
 
-        if (!email || email.indexOf('@') === -1) {
-          setAuthFieldError('login-email', 'login-email-error', 'Ingresa un email válido');
-          hasError = true;
+        if (emailError) setAuthFieldError('login-email', 'login-email-error', emailError);
+        if (passwordError) setAuthFieldError('login-password', 'login-password-error', passwordError);
+        if (emailError || passwordError) return;
+
+        setAuthLoading(true);
+        try {
+          const result = await loginWithSupabase(email, password);
+          const profile = await fetchProfile(result.user.id);
+          const username = profile ? profile.username : email.split('@')[0];
+          enterHomeFromAuth(username, email, result.user.id);
+        } catch (err) {
+          setAuthFieldError('login-email', 'login-email-error', mapSupabaseAuthError(err));
+        } finally {
+          setAuthLoading(false);
         }
-
-        if (!password || password.length <= 5) {
-          setAuthFieldError('login-password', 'login-password-error', 'La contraseña debe tener más de 5 caracteres');
-          hasError = true;
-        }
-
-        if (hasError) return;
-
-        const username = getStoredUser() || email.split('@')[0];
-        enterHomeFromAuth(username, email);
       });
 
-      ['register-username', 'register-email', 'login-email', 'login-password'].forEach(function (id) {
+      ['register-username', 'register-email', 'register-password', 'login-email', 'login-password'].forEach(function (id) {
         const input = document.getElementById(id);
         if (!input) return;
         input.addEventListener('input', function () {
@@ -2361,6 +2493,12 @@
       }
 
       syncHomeMusic(screenId);
+
+      if (screenId === 'home-screen' && supabaseClient) {
+        refreshLeaderboardFromServer().then(function () {
+          renderLeaderboard();
+        });
+      }
     }
 
     /* ── Lifecycle / cleanup ── */
@@ -3561,11 +3699,12 @@
     function finishGame() {
       if (gameState.gameOver) return;
       stopGame();
-      const rank = submitLeaderboardResult();
-      renderResults(rank);
-      activateScreen('result-screen');
-      syncNav('result-screen');
-      syncHomeMusic('result-screen');
+      submitLeaderboardResult().then(function (rank) {
+        renderResults(rank);
+        activateScreen('result-screen');
+        syncNav('result-screen');
+        syncHomeMusic('result-screen');
+      });
     }
 
     function initGameControls() {
@@ -3601,39 +3740,55 @@
     };
 
     const DEFAULT_LEADERBOARD = [
-      { name: 'NEON_KING',    score: 980, avgTime: '14 clicks', isPlayer: false },
-      { name: 'CYBER_PULSE',  score: 870, avgTime: '12 clicks', isPlayer: false },
-      { name: 'GRID_RUNNER',  score: 760, avgTime: '11 clicks', isPlayer: false },
-      { name: 'PHANTOM_BEAT', score: 650, avgTime: '10 clicks', isPlayer: false },
-      { name: 'VOID_SYNC',    score: 520, avgTime: '9 clicks',  isPlayer: false }
+      { name: 'NEON_KING',    score: 980, avgTime: '14 clicks', isPlayer: false, hasPlayed: true },
+      { name: 'CYBER_PULSE',  score: 870, avgTime: '12 clicks', isPlayer: false, hasPlayed: true },
+      { name: 'GRID_RUNNER',  score: 760, avgTime: '11 clicks', isPlayer: false, hasPlayed: true },
+      { name: 'PHANTOM_BEAT', score: 650, avgTime: '10 clicks', isPlayer: false, hasPlayed: true },
+      { name: 'VOID_SYNC',    score: 520, avgTime: '9 clicks',  isPlayer: false, hasPlayed: true }
     ];
 
-    function getLeaderboardEntries() {
-      try {
-        const raw = localStorage.getItem(STORAGE_LEADERBOARD);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.length) return parsed;
-        }
-      } catch (e) { /* localStorage no disponible */ }
+    async function refreshLeaderboardFromServer() {
+      if (!supabaseClient) {
+        leaderboardCache = DEFAULT_LEADERBOARD.slice();
+        return leaderboardCache;
+      }
 
-      const defaults = DEFAULT_LEADERBOARD.map(function (e) {
+      const { data, error } = await supabaseClient
+        .from('scores')
+        .select('username, score, avg_clicks')
+        .order('score', { ascending: false });
+
+      if (error || !data) {
+        console.warn('TapBeat: no se pudo cargar leaderboard', error);
+        leaderboardCache = DEFAULT_LEADERBOARD.slice();
+        return leaderboardCache;
+      }
+
+      const currentUser = getStoredUser();
+      leaderboardCache = data.map(function (row) {
+        const avgVal = row.avg_clicks !== null && row.avg_clicks !== undefined
+          ? Number(row.avg_clicks)
+          : null;
         return {
-          name: e.name,
-          score: e.score,
-          avgTime: e.avgTime,
-          isPlayer: false,
+          name: row.username,
+          score: row.score,
+          avgTime: avgVal !== null ? avgVal + ' clicks' : '—',
+          isPlayer: row.username === currentUser,
           hasPlayed: true
         };
       });
-      saveLeaderboardEntries(defaults);
-      return defaults;
+
+      if (leaderboardCache.length === 0) {
+        leaderboardCache = DEFAULT_LEADERBOARD.slice();
+      }
+
+      return leaderboardCache;
     }
 
-    function saveLeaderboardEntries(entries) {
-      try {
-        localStorage.setItem(STORAGE_LEADERBOARD, JSON.stringify(entries));
-      } catch (e) { /* file:// puede bloquear localStorage */ }
+    function getLeaderboardEntries() {
+      if (leaderboardCache.length) return leaderboardCache;
+      leaderboardCache = DEFAULT_LEADERBOARD.slice();
+      return leaderboardCache;
     }
 
     function buildRankedLeaderboard() {
@@ -3649,13 +3804,13 @@
             name: entry.name,
             score: entry.score,
             avgTime: entry.avgTime,
-            isPlayer: !!entry.isPlayer,
+            isPlayer: !!entry.isPlayer || entry.name === getStoredUser(),
             hasPlayed: entry.hasPlayed !== false || entry.score > 0
           };
         });
     }
 
-    function submitLeaderboardResult() {
+    async function submitLeaderboardResult() {
       const username = getStoredUser();
       if (!username || isResultSuspicious()) return 0;
 
@@ -3663,25 +3818,30 @@
       const avgClicks = getAvgClicksPerRound();
       const avgTime = avgClicks !== null ? avgClicks + ' clicks' : '0';
 
-      const entries = getLeaderboardEntries();
-      const idx = entries.findIndex(function (e) { return e.name === username; });
+      if (supabaseClient && currentUserId) {
+        const { data: existing } = await supabaseClient
+          .from('scores')
+          .select('score')
+          .eq('user_id', currentUserId)
+          .maybeSingle();
 
-      if (idx < 0) {
-        entries.push({
-          name: username,
-          score: score,
-          avgTime: avgTime,
-          isPlayer: true,
-          hasPlayed: true
-        });
-      } else if (score >= entries[idx].score || !entries[idx].hasPlayed) {
-        entries[idx].score = score;
-        entries[idx].avgTime = avgTime;
-        entries[idx].hasPlayed = true;
-        entries[idx].isPlayer = true;
+        if (!existing || score >= existing.score) {
+          const { error } = await supabaseClient.from('scores').upsert({
+            user_id: currentUserId,
+            username: username,
+            score: score,
+            avg_clicks: avgClicks !== null ? avgClicks : null,
+            played_at: new Date().toISOString()
+          }, { onConflict: 'user_id' });
+
+          if (error) {
+            console.warn('TapBeat: no se pudo guardar score', error);
+          }
+        }
+
+        await refreshLeaderboardFromServer();
       }
 
-      saveLeaderboardEntries(entries);
       renderLeaderboard();
 
       const ranked = buildRankedLeaderboard();
@@ -3750,7 +3910,6 @@
 
     function initHome() {
       initHomeMusicControls();
-      getLeaderboardEntries();
       updatePoolDisplay();
 
       if (poolInterval) { clearInterval(poolInterval); }
@@ -3769,23 +3928,63 @@
       });
     }
 
-    function initApp() {
+    async function bootstrapApp() {
       initBgGrid();
       initAuth();
       initHome();
       initGameControls();
       drawWave();
 
-      if (getStoredUser()) {
-        ensureCurrentUserInLeaderboard();
+      const supabaseReady = initSupabaseClient();
+      if (supabaseReady) {
+        await refreshLeaderboardFromServer();
+        renderLeaderboard();
+
+        try {
+          const session = await getSupabaseSession();
+          if (session && session.user) {
+            currentUserId = session.user.id;
+            const profile = await fetchProfile(session.user.id);
+            if (profile) {
+              registerUserProfile(profile.username, profile.email, session.user.id);
+              updateUserGreeting();
+              activateScreen('home-screen');
+              preloadCustomSounds().then(function () {
+                syncHomeMusic('home-screen');
+              });
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn('TapBeat: error al restaurar sesión', err);
+          clearSession();
+        }
+
+        supabaseClient.auth.onAuthStateChange(function (event, session) {
+          if (event === 'SIGNED_OUT') {
+            clearSession();
+            activateScreen('auth-screen');
+          }
+        });
+      }
+
+      if (getStoredUser() && !supabaseReady) {
         updateUserGreeting();
         activateScreen('home-screen');
         preloadCustomSounds().then(function () {
           syncHomeMusic('home-screen');
         });
-      } else {
-        activateScreen('auth-screen');
+        return;
       }
+
+      activateScreen('auth-screen');
+    }
+
+    function initApp() {
+      bootstrapApp().catch(function (err) {
+        console.error('TapBeat: error al iniciar', err);
+        activateScreen('auth-screen');
+      });
     }
 
     /* ── Fondo: grid con perspectiva + ondas ── */
