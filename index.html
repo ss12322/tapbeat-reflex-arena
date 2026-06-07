@@ -1721,6 +1721,61 @@
       border-color: rgba(255, 62, 108, 0.5);
     }
 
+    .auth-password-wrap {
+      position: relative;
+      width: 100%;
+    }
+
+    .auth-password-wrap .auth-input {
+      padding-right: 2.75rem;
+    }
+
+    .auth-password-toggle {
+      position: absolute;
+      right: 0.6rem;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 2rem;
+      height: 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      border-radius: var(--radius-sm);
+      color: var(--color-text-muted);
+      cursor: pointer;
+      padding: 0;
+      transition: color 0.2s;
+    }
+
+    .auth-password-toggle:hover,
+    .auth-password-toggle.is-visible {
+      color: var(--color-primary);
+    }
+
+    .auth-password-toggle svg {
+      width: 1.1rem;
+      height: 1.1rem;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.75;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .auth-password-toggle .eye-off {
+      display: none;
+    }
+
+    .auth-password-toggle.is-visible .eye-on {
+      display: none;
+    }
+
+    .auth-password-toggle.is-visible .eye-off {
+      display: block;
+    }
+
     .auth-field-error {
       font-family: var(--font-mono);
       font-size: 0.68rem;
@@ -1833,13 +1888,33 @@
         </div>
         <div class="auth-field">
           <label class="auth-label" for="register-password">Contraseña</label>
-          <input
-            class="auth-input"
-            type="password"
-            id="register-password"
-            placeholder="••••••••"
-            autocomplete="new-password"
-          >
+          <div class="auth-password-wrap">
+            <input
+              class="auth-input"
+              type="password"
+              id="register-password"
+              placeholder="••••••••"
+              autocomplete="new-password"
+            >
+            <button
+              type="button"
+              class="auth-password-toggle"
+              data-target="register-password"
+              aria-label="Mostrar contraseña"
+              aria-pressed="false"
+            >
+              <svg class="eye-on" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+              <svg class="eye-off" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-10-8-10-8a18.45 18.45 0 0 1 5.06-5.94"></path>
+                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19"></path>
+                <path d="M1 1l22 22"></path>
+                <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"></path>
+              </svg>
+            </button>
+          </div>
           <span class="auth-field-error" id="register-password-error"></span>
         </div>
         <button type="submit" class="auth-submit" id="btn-register-submit">ENTRAR A LA ARENA</button>
@@ -1859,13 +1934,33 @@
         </div>
         <div class="auth-field">
           <label class="auth-label" for="login-password">Contraseña</label>
-          <input
-            class="auth-input"
-            type="password"
-            id="login-password"
-            placeholder="••••••••"
-            autocomplete="current-password"
-          >
+          <div class="auth-password-wrap">
+            <input
+              class="auth-input"
+              type="password"
+              id="login-password"
+              placeholder="••••••••"
+              autocomplete="current-password"
+            >
+            <button
+              type="button"
+              class="auth-password-toggle"
+              data-target="login-password"
+              aria-label="Mostrar contraseña"
+              aria-pressed="false"
+            >
+              <svg class="eye-on" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+              <svg class="eye-off" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-10-8-10-8a18.45 18.45 0 0 1 5.06-5.94"></path>
+                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19"></path>
+                <path d="M1 1l22 22"></path>
+                <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"></path>
+              </svg>
+            </button>
+          </div>
           <span class="auth-field-error" id="login-password-error"></span>
         </div>
         <button type="submit" class="auth-submit" id="btn-login-submit">INICIAR SESIÓN</button>
@@ -2361,7 +2456,25 @@
       }, 400);
     }
 
+    function initPasswordToggles() {
+      document.querySelectorAll('.auth-password-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const inputId = btn.getAttribute('data-target');
+          const input = document.getElementById(inputId);
+          if (!input) return;
+
+          const show = input.type === 'password';
+          input.type = show ? 'text' : 'password';
+          btn.classList.toggle('is-visible', show);
+          btn.setAttribute('aria-label', show ? 'Ocultar contraseña' : 'Mostrar contraseña');
+          btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+        });
+      });
+    }
+
     function initAuth() {
+      initPasswordToggles();
+
       document.getElementById('btn-show-login').addEventListener('click', function () {
         showAuthForm('login');
       });
@@ -2453,7 +2566,8 @@
         if (!input) return;
         input.addEventListener('input', function () {
           input.classList.remove('is-error');
-          const errorEl = input.parentElement.querySelector('.auth-field-error');
+          const field = input.closest('.auth-field');
+          const errorEl = field ? field.querySelector('.auth-field-error') : null;
           if (errorEl) errorEl.textContent = '';
         });
       });
