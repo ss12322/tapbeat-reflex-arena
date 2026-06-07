@@ -160,6 +160,21 @@
       display: flex;
     }
 
+    .screen.auth-transition-out {
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      pointer-events: none;
+    }
+
+    @keyframes authFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .screen.auth-transition-in {
+      animation: authFadeIn 0.4s ease forwards;
+    }
+
     .screen-title {
       font-family: var(--font-display);
       font-size: clamp(2.5rem, 8vw, 4rem);
@@ -1608,14 +1623,244 @@
     .music-mute-btn.is-muted .music-mute-icon--off {
       display: inline;
     }
+
+    /* ── Auth / Login ── */
+    #auth-screen {
+      justify-content: center;
+      gap: 1.75rem;
+      background: #0a0a0f;
+    }
+
+    .auth-header {
+      text-align: center;
+    }
+
+    .auth-logo {
+      font-family: var(--font-display);
+      font-size: clamp(3rem, 12vw, 5rem);
+      letter-spacing: 0.2em;
+      color: var(--color-primary);
+      text-shadow: 0 0 30px rgba(0, 255, 136, 0.5);
+      line-height: 1;
+    }
+
+    .auth-subtitle {
+      font-size: 0.7rem;
+      color: rgba(168, 85, 247, 0.75);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-top: 0.35rem;
+    }
+
+    .auth-card {
+      background: #12121a;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 12px;
+      padding: 32px;
+      width: 100%;
+      max-width: 380px;
+      box-sizing: border-box;
+    }
+
+    .auth-form {
+      display: flex;
+      flex-direction: column;
+      gap: 1.1rem;
+    }
+
+    .auth-form.is-hidden {
+      display: none;
+    }
+
+    .auth-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .auth-label {
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+    }
+
+    .auth-input {
+      width: 100%;
+      box-sizing: border-box;
+      background: #1a1a26;
+      border: 1px solid rgba(0, 255, 136, 0.18);
+      border-radius: var(--radius-sm);
+      padding: 0.75rem 0.85rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: #fff;
+      transition: box-shadow 0.2s;
+    }
+
+    .auth-input::placeholder {
+      color: rgba(107, 107, 128, 0.8);
+    }
+
+    .auth-input:focus {
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(0, 255, 136, 0.3);
+    }
+
+    .auth-input.is-error {
+      border-color: rgba(255, 62, 108, 0.5);
+    }
+
+    .auth-field-error {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: #ff3e6c;
+      min-height: 1em;
+      line-height: 1.3;
+    }
+
+    .auth-submit {
+      width: 100%;
+      margin-top: 0.25rem;
+      background: #00ff88;
+      color: #000;
+      font-family: var(--font-display);
+      font-size: 22px;
+      letter-spacing: 3px;
+      border: none;
+      border-radius: 10px;
+      padding: 0.85rem 1rem;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+
+    .auth-submit:hover {
+      opacity: 0.9;
+    }
+
+    .auth-submit:active {
+      transform: scale(0.97);
+    }
+
+    .auth-switch {
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: #666680;
+      margin-top: 1.25rem;
+    }
+
+    .auth-switch-link {
+      color: #00ff88;
+      cursor: pointer;
+      background: none;
+      border: none;
+      font-family: inherit;
+      font-size: inherit;
+      padding: 0;
+      margin: 0;
+    }
+
+    .auth-switch-link:hover {
+      text-decoration: underline;
+    }
+
+    .auth-switch.is-hidden {
+      display: none;
+    }
+
+    .home-user-greeting {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: rgba(0, 255, 136, 0.65);
+      letter-spacing: 0.05em;
+      z-index: 2;
+    }
   </style>
 </head>
 <body>
   <canvas id="bg-grid-canvas" aria-hidden="true"></canvas>
   <audio id="home-music-el" src="sounds/tron-juego.wav" loop preload="auto" hidden></audio>
 
+  <!-- AUTH -->
+  <section id="auth-screen" class="screen active">
+    <header class="auth-header">
+      <h1 class="auth-logo">TAPBEAT</h1>
+      <p class="auth-subtitle">REFLEX ARENA · AUDIO EDITION</p>
+    </header>
+
+    <div class="auth-card">
+      <form class="auth-form" id="register-form" novalidate>
+        <div class="auth-field">
+          <label class="auth-label" for="register-username">Nombre de usuario</label>
+          <input
+            class="auth-input"
+            type="text"
+            id="register-username"
+            placeholder="Ej: CarlosV_CLO"
+            autocomplete="username"
+          >
+          <span class="auth-field-error" id="register-username-error"></span>
+        </div>
+        <div class="auth-field">
+          <label class="auth-label" for="register-email">Email</label>
+          <input
+            class="auth-input"
+            type="email"
+            id="register-email"
+            placeholder="tu@email.com"
+            autocomplete="email"
+          >
+          <span class="auth-field-error" id="register-email-error"></span>
+        </div>
+        <button type="submit" class="auth-submit">ENTRAR A LA ARENA</button>
+      </form>
+
+      <form class="auth-form is-hidden" id="login-form" novalidate>
+        <div class="auth-field">
+          <label class="auth-label" for="login-email">Email</label>
+          <input
+            class="auth-input"
+            type="email"
+            id="login-email"
+            placeholder="tu@email.com"
+            autocomplete="email"
+          >
+          <span class="auth-field-error" id="login-email-error"></span>
+        </div>
+        <div class="auth-field">
+          <label class="auth-label" for="login-password">Contraseña</label>
+          <input
+            class="auth-input"
+            type="password"
+            id="login-password"
+            placeholder="••••••••"
+            autocomplete="current-password"
+          >
+          <span class="auth-field-error" id="login-password-error"></span>
+        </div>
+        <button type="submit" class="auth-submit">INICIAR SESIÓN</button>
+      </form>
+
+      <p class="auth-switch" id="auth-switch-register">
+        ¿Ya tienes cuenta?
+        <button type="button" class="auth-switch-link" id="btn-show-login">Inicia sesión</button>
+      </p>
+      <p class="auth-switch is-hidden" id="auth-switch-login">
+        ¿No tienes cuenta?
+        <button type="button" class="auth-switch-link" id="btn-show-register">Regístrate</button>
+      </p>
+    </div>
+  </section>
+
   <!-- HOME -->
-  <section id="home-screen" class="screen active">
+  <section id="home-screen" class="screen">
+    <span class="home-user-greeting" id="home-user-greeting" hidden></span>
     <header class="home-header">
       <h1 class="home-logo">TAPBEAT</h1>
       <p class="home-subtitle">REFLEX ARENA · AUDIO EDITION</p>
@@ -1851,7 +2096,8 @@
 
   <!-- Nav dev -->
   <nav class="nav-dev" aria-label="Navegación de prueba">
-    <button onclick="showScreen('home-screen')" data-screen="home-screen" class="active">Home</button>
+    <button onclick="showScreen('auth-screen')" data-screen="auth-screen" class="active">Auth</button>
+    <button onclick="showScreen('home-screen')" data-screen="home-screen">Home</button>
     <button onclick="showScreen('welcome-screen')" data-screen="welcome-screen">Welcome</button>
     <button onclick="showScreen('countdown-screen')" data-screen="countdown-screen">Countdown</button>
     <button onclick="showScreen('game-screen')" data-screen="game-screen">Game</button>
@@ -1860,12 +2106,174 @@
 
   <script>
     const SCREENS = [
+      'auth-screen',
       'home-screen',
       'welcome-screen',
       'countdown-screen',
       'game-screen',
       'result-screen'
     ];
+
+    const STORAGE_USER = 'tapbeat_user';
+    const STORAGE_EMAIL = 'tapbeat_email';
+    const USERNAME_RE = /^[a-zA-Z0-9_]{3,}$/;
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    function getStoredUser() {
+      try {
+        return localStorage.getItem(STORAGE_USER);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function saveSession(username, email) {
+      try {
+        localStorage.setItem(STORAGE_USER, username);
+        if (email) localStorage.setItem(STORAGE_EMAIL, email);
+      } catch (e) { /* file:// puede bloquear localStorage */ }
+    }
+
+    function updateUserGreeting() {
+      const user = getStoredUser();
+      const el = document.getElementById('home-user-greeting');
+      if (!el) return;
+      if (user) {
+        el.textContent = 'Hola, ' + user;
+        el.hidden = false;
+      } else {
+        el.textContent = '';
+        el.hidden = true;
+      }
+    }
+
+    function setAuthFieldError(inputId, errorId, message) {
+      const input = document.getElementById(inputId);
+      const error = document.getElementById(errorId);
+      if (input) input.classList.toggle('is-error', !!message);
+      if (error) error.textContent = message || '';
+    }
+
+    function clearAuthErrors(formId) {
+      const form = document.getElementById(formId);
+      if (!form) return;
+      form.querySelectorAll('.auth-input').forEach(function (input) {
+        input.classList.remove('is-error');
+      });
+      form.querySelectorAll('.auth-field-error').forEach(function (el) {
+        el.textContent = '';
+      });
+    }
+
+    function validateUsername(value) {
+      if (!value) return 'El nombre de usuario es obligatorio';
+      if (/\s/.test(value)) return 'No se permiten espacios';
+      if (!USERNAME_RE.test(value)) {
+        return 'Mínimo 3 caracteres: letras, números o guión bajo';
+      }
+      return '';
+    }
+
+    function validateEmail(value) {
+      if (!value) return 'El email es obligatorio';
+      if (!EMAIL_RE.test(value)) return 'Ingresa un email válido';
+      return '';
+    }
+
+    function showAuthForm(mode) {
+      const isLogin = mode === 'login';
+      document.getElementById('register-form').classList.toggle('is-hidden', isLogin);
+      document.getElementById('login-form').classList.toggle('is-hidden', !isLogin);
+      document.getElementById('auth-switch-register').classList.toggle('is-hidden', isLogin);
+      document.getElementById('auth-switch-login').classList.toggle('is-hidden', !isLogin);
+      clearAuthErrors('register-form');
+      clearAuthErrors('login-form');
+    }
+
+    function enterHomeFromAuth(username, email) {
+      saveSession(username, email);
+      updateUserGreeting();
+
+      const authScreen = document.getElementById('auth-screen');
+      const homeScreen = document.getElementById('home-screen');
+
+      authScreen.classList.add('auth-transition-out');
+
+      setTimeout(function () {
+        authScreen.classList.remove('active', 'auth-transition-out');
+        homeScreen.classList.add('active', 'auth-transition-in');
+        initAudio();
+        preloadCustomSounds().then(function () {
+          syncHomeMusic('home-screen');
+        });
+
+        setTimeout(function () {
+          homeScreen.classList.remove('auth-transition-in');
+        }, 400);
+      }, 400);
+    }
+
+    function initAuth() {
+      document.getElementById('btn-show-login').addEventListener('click', function () {
+        showAuthForm('login');
+      });
+
+      document.getElementById('btn-show-register').addEventListener('click', function () {
+        showAuthForm('register');
+      });
+
+      document.getElementById('register-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        clearAuthErrors('register-form');
+
+        const username = document.getElementById('register-username').value.trim();
+        const email = document.getElementById('register-email').value.trim();
+
+        const usernameError = validateUsername(username);
+        const emailError = validateEmail(email);
+
+        if (usernameError) setAuthFieldError('register-username', 'register-username-error', usernameError);
+        if (emailError) setAuthFieldError('register-email', 'register-email-error', emailError);
+        if (usernameError || emailError) return;
+
+        enterHomeFromAuth(username, email);
+      });
+
+      document.getElementById('login-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        clearAuthErrors('login-form');
+
+        const email = document.getElementById('login-email').value.trim();
+        const password = document.getElementById('login-password').value;
+
+        let hasError = false;
+
+        if (!email || email.indexOf('@') === -1) {
+          setAuthFieldError('login-email', 'login-email-error', 'Ingresa un email válido');
+          hasError = true;
+        }
+
+        if (!password || password.length <= 5) {
+          setAuthFieldError('login-password', 'login-password-error', 'La contraseña debe tener más de 5 caracteres');
+          hasError = true;
+        }
+
+        if (hasError) return;
+
+        const username = getStoredUser() || email.split('@')[0];
+        enterHomeFromAuth(username, email);
+      });
+
+      ['register-username', 'register-email', 'login-email', 'login-password'].forEach(function (id) {
+        const input = document.getElementById(id);
+        if (!input) return;
+        input.addEventListener('input', function () {
+          input.classList.remove('is-error');
+          const errorEl = input.parentElement.querySelector('.auth-field-error');
+          if (errorEl) errorEl.textContent = '';
+        });
+      });
+    }
 
     function activateScreen(screenId) {
       SCREENS.forEach(function (id) {
@@ -3214,12 +3622,20 @@
 
     function initApp() {
       initBgGrid();
+      initAuth();
       initHome();
       initGameControls();
       drawWave();
-      preloadCustomSounds().then(function () {
-        syncHomeMusic('home-screen');
-      });
+
+      if (getStoredUser()) {
+        updateUserGreeting();
+        activateScreen('home-screen');
+        preloadCustomSounds().then(function () {
+          syncHomeMusic('home-screen');
+        });
+      } else {
+        activateScreen('auth-screen');
+      }
     }
 
     /* ── Fondo: grid con perspectiva + ondas ── */
