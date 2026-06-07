@@ -1334,6 +1334,14 @@
       background: rgba(0, 255, 136, 0.08);
     }
 
+    .home-stack .leaderboard-table tbody tr.is-player {
+      background: rgba(0, 255, 136, 0.05);
+    }
+
+    .home-stack .leaderboard-table tbody tr.is-player .col-name {
+      color: var(--color-primary);
+    }
+
     .prize-pool-total {
       text-align: center;
       padding: 0.75rem 0 0.5rem;
@@ -2116,6 +2124,8 @@
 
     const STORAGE_USER = 'tapbeat_user';
     const STORAGE_EMAIL = 'tapbeat_email';
+    const STORAGE_PROFILE = 'tapbeat_profile';
+    const STORAGE_LEADERBOARD = 'tapbeat_leaderboard';
     const USERNAME_RE = /^[a-zA-Z0-9_]{3,}$/;
     const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -2132,6 +2142,48 @@
         localStorage.setItem(STORAGE_USER, username);
         if (email) localStorage.setItem(STORAGE_EMAIL, email);
       } catch (e) { /* file:// puede bloquear localStorage */ }
+    }
+
+    function registerUserProfile(username, email) {
+      saveSession(username, email);
+      try {
+        localStorage.setItem(STORAGE_PROFILE, JSON.stringify({
+          username: username,
+          email: email || '',
+          createdAt: Date.now()
+        }));
+      } catch (e) { /* file:// puede bloquear localStorage */ }
+
+      const entries = getLeaderboardEntries();
+      if (!entries.some(function (e) { return e.name === username; })) {
+        entries.push({
+          name: username,
+          score: 0,
+          avgTime: '—',
+          isPlayer: true,
+          hasPlayed: false
+        });
+        saveLeaderboardEntries(entries);
+      }
+      renderLeaderboard();
+    }
+
+    function ensureCurrentUserInLeaderboard() {
+      const username = getStoredUser();
+      if (!username) return;
+
+      const entries = getLeaderboardEntries();
+      if (!entries.some(function (e) { return e.name === username; })) {
+        entries.push({
+          name: username,
+          score: 0,
+          avgTime: '—',
+          isPlayer: true,
+          hasPlayed: false
+        });
+        saveLeaderboardEntries(entries);
+        renderLeaderboard();
+      }
     }
 
     function updateUserGreeting() {
@@ -2191,7 +2243,7 @@
     }
 
     function enterHomeFromAuth(username, email) {
-      saveSession(username, email);
+      registerUserProfile(username, email);
       updateUserGreeting();
 
       const authScreen = document.getElementById('auth-screen');
@@ -3453,10 +3505,10 @@
       return rank + '°';
     }
 
-    function renderResults() {
+    function renderResults(actualRank) {
       const suspicious = isResultSuspicious();
       const score = gameState.score;
-      const rank = suspicious ? 0 : getSimulatedRank(score);
+      const rank = suspicious ? 0 : (actualRank || getSimulatedRank(score));
       const avgClicks = getAvgClicksPerRound();
       const prize = suspicious ? null : getPrizeForRank(rank);
 
@@ -3509,7 +3561,8 @@
     function finishGame() {
       if (gameState.gameOver) return;
       stopGame();
-      renderResults();
+      const rank = submitLeaderboardResult();
+      renderResults(rank);
       activateScreen('result-screen');
       syncNav('result-screen');
       syncHomeMusic('result-screen');
@@ -3547,13 +3600,94 @@
       creator: 0.20
     };
 
-    const LEADERBOARD_DATA = [
-      { rank: 1, name: 'NEON_KING',    score: 9840, avgTime: '142ms' },
-      { rank: 2, name: 'CYBER_PULSE',  score: 8720, avgTime: '158ms' },
-      { rank: 3, name: 'GRID_RUNNER',  score: 7650, avgTime: '171ms' },
-      { rank: 4, name: 'PHANTOM_BEAT', score: 6980, avgTime: '189ms' },
-      { rank: 5, name: 'VOID_SYNC',    score: 6120, avgTime: '205ms' }
+    const DEFAULT_LEADERBOARD = [
+      { name: 'NEON_KING',    score: 980, avgTime: '14 clicks', isPlayer: false },
+      { name: 'CYBER_PULSE',  score: 870, avgTime: '12 clicks', isPlayer: false },
+      { name: 'GRID_RUNNER',  score: 760, avgTime: '11 clicks', isPlayer: false },
+      { name: 'PHANTOM_BEAT', score: 650, avgTime: '10 clicks', isPlayer: false },
+      { name: 'VOID_SYNC',    score: 520, avgTime: '9 clicks',  isPlayer: false }
     ];
+
+    function getLeaderboardEntries() {
+      try {
+        const raw = localStorage.getItem(STORAGE_LEADERBOARD);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length) return parsed;
+        }
+      } catch (e) { /* localStorage no disponible */ }
+
+      const defaults = DEFAULT_LEADERBOARD.map(function (e) {
+        return {
+          name: e.name,
+          score: e.score,
+          avgTime: e.avgTime,
+          isPlayer: false,
+          hasPlayed: true
+        };
+      });
+      saveLeaderboardEntries(defaults);
+      return defaults;
+    }
+
+    function saveLeaderboardEntries(entries) {
+      try {
+        localStorage.setItem(STORAGE_LEADERBOARD, JSON.stringify(entries));
+      } catch (e) { /* file:// puede bloquear localStorage */ }
+    }
+
+    function buildRankedLeaderboard() {
+      return getLeaderboardEntries()
+        .slice()
+        .sort(function (a, b) {
+          if (b.score !== a.score) return b.score - a.score;
+          return a.name.localeCompare(b.name);
+        })
+        .map(function (entry, index) {
+          return {
+            rank: index + 1,
+            name: entry.name,
+            score: entry.score,
+            avgTime: entry.avgTime,
+            isPlayer: !!entry.isPlayer,
+            hasPlayed: entry.hasPlayed !== false || entry.score > 0
+          };
+        });
+    }
+
+    function submitLeaderboardResult() {
+      const username = getStoredUser();
+      if (!username || isResultSuspicious()) return 0;
+
+      const score = gameState.score;
+      const avgClicks = getAvgClicksPerRound();
+      const avgTime = avgClicks !== null ? avgClicks + ' clicks' : '0';
+
+      const entries = getLeaderboardEntries();
+      const idx = entries.findIndex(function (e) { return e.name === username; });
+
+      if (idx < 0) {
+        entries.push({
+          name: username,
+          score: score,
+          avgTime: avgTime,
+          isPlayer: true,
+          hasPlayed: true
+        });
+      } else if (score >= entries[idx].score || !entries[idx].hasPlayed) {
+        entries[idx].score = score;
+        entries[idx].avgTime = avgTime;
+        entries[idx].hasPlayed = true;
+        entries[idx].isPlayer = true;
+      }
+
+      saveLeaderboardEntries(entries);
+      renderLeaderboard();
+
+      const ranked = buildRankedLeaderboard();
+      const playerEntry = ranked.find(function (e) { return e.name === username; });
+      return playerEntry ? playerEntry.rank : 0;
+    }
 
     function formatPool(value) {
       return value.toFixed(2);
@@ -3584,16 +3718,30 @@
 
     function renderLeaderboard() {
       const tbody = document.getElementById('leaderboard-body');
-      tbody.innerHTML = LEADERBOARD_DATA.map(function (entry) {
-        const prize = getPrizeForRank(entry.rank);
+      if (!tbody) return;
+
+      const currentUser = getStoredUser();
+      const ranked = buildRankedLeaderboard();
+      let toShow = ranked.slice(0, 5);
+
+      if (currentUser && !toShow.some(function (e) { return e.name === currentUser; })) {
+        const userEntry = ranked.find(function (e) { return e.name === currentUser; });
+        if (userEntry) toShow = toShow.concat([userEntry]);
+      }
+
+      tbody.innerHTML = toShow.map(function (entry) {
+        const prize = entry.hasPlayed && entry.score > 0 ? getPrizeForRank(entry.rank) : null;
         const prizeCell = prize !== null
           ? '<td class="col-prize">' + formatPool(prize) + '</td>'
           : '<td class="col-prize empty">—</td>';
-        const topClass = entry.rank === 1 ? ' class="is-top"' : '';
-        return '<tr' + topClass + '>' +
+        let rowClass = '';
+        if (entry.rank === 1) rowClass = 'is-top';
+        if (entry.name === currentUser) rowClass += (rowClass ? ' ' : '') + 'is-player';
+        const scoreDisplay = entry.hasPlayed && entry.score > 0 ? entry.score : (entry.isPlayer ? '0' : entry.score);
+        return '<tr' + (rowClass ? ' class="' + rowClass + '"' : '') + '>' +
           '<td class="col-rank">' + entry.rank + '</td>' +
           '<td class="col-name">' + entry.name + '</td>' +
-          '<td class="col-score">' + entry.score + '</td>' +
+          '<td class="col-score">' + scoreDisplay + '</td>' +
           '<td class="col-time">' + entry.avgTime + '</td>' +
           prizeCell +
         '</tr>';
@@ -3602,6 +3750,7 @@
 
     function initHome() {
       initHomeMusicControls();
+      getLeaderboardEntries();
       updatePoolDisplay();
 
       if (poolInterval) { clearInterval(poolInterval); }
@@ -3628,6 +3777,7 @@
       drawWave();
 
       if (getStoredUser()) {
+        ensureCurrentUserInLeaderboard();
         updateUserGreeting();
         activateScreen('home-screen');
         preloadCustomSounds().then(function () {
