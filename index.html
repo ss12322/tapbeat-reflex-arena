@@ -944,6 +944,65 @@
       gap: 0.75rem;
     }
 
+    /* ── Welcome / Briefing ── */
+    #welcome-screen {
+      gap: 0;
+    }
+
+    .welcome-layout {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+      width: 100%;
+      max-width: 420px;
+    }
+
+    .welcome-card {
+      background: rgba(0, 0, 0, 0.22);
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
+      border: 1px solid rgba(0, 255, 136, 0.28);
+      border-radius: var(--radius-md);
+      padding: 1.5rem 1.25rem;
+      width: 100%;
+      text-align: center;
+    }
+
+    .welcome-title {
+      font-family: var(--font-display);
+      font-size: clamp(1.75rem, 6vw, 2.25rem);
+      letter-spacing: 0.1em;
+      color: var(--color-primary);
+      text-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+      margin-bottom: 1rem;
+      line-height: 1.1;
+    }
+
+    .welcome-text {
+      font-size: 0.82rem;
+      color: var(--color-text);
+      line-height: 1.7;
+      text-align: left;
+    }
+
+    .welcome-text p {
+      margin-bottom: 0.85rem;
+    }
+
+    .welcome-text p:last-child {
+      margin-bottom: 0;
+      color: var(--color-secondary);
+      font-weight: 700;
+      text-align: center;
+      letter-spacing: 0.04em;
+    }
+
+    #btn-continue-tournament {
+      width: 100%;
+      letter-spacing: 0.12em;
+    }
+
     /* ── Countdown ── */
     #countdown-screen {
       gap: 0;
@@ -1413,7 +1472,7 @@
       width: 100%;
       max-width: 420px;
       margin: 0 auto;
-      padding: 0.5rem 0 0.25rem;
+      padding: 0.25rem 0;
       box-sizing: border-box;
     }
 
@@ -1549,16 +1608,6 @@
     .music-mute-btn.is-muted .music-mute-icon--off {
       display: inline;
     }
-
-    .home-music-hint {
-      font-size: 0.55rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--color-text-muted);
-      text-align: center;
-      margin-top: 0.35rem;
-      opacity: 0.85;
-    }
   </style>
 </head>
 <body>
@@ -1596,7 +1645,6 @@
         <span class="music-mute-icon music-mute-icon--off" aria-hidden="true">✕</span>
       </button>
     </div>
-    <p class="home-music-hint" id="home-music-hint" hidden>Toca la pantalla para iniciar la música</p>
 
     <div class="home-stack">
       <div class="card" id="prize-pool-card">
@@ -1628,6 +1676,13 @@
         </div>
       </div>
 
+      <div class="home-actions">
+        <button class="btn btn-primary btn-lg btn-block" id="btn-join-tournament">
+          UNIRSE AL TORNEO
+        </button>
+        <span class="badge badge-antitramp">Anti-Trampa Verificado</span>
+      </div>
+
       <div class="card">
         <div class="card-header">
           <span class="card-title">Leaderboard</span>
@@ -1646,13 +1701,23 @@
           <tbody id="leaderboard-body"></tbody>
         </table>
       </div>
+    </div>
+  </section>
 
-      <div class="home-actions">
-        <button class="btn btn-primary btn-lg btn-block" id="btn-join-tournament">
-          UNIRSE AL TORNEO
-        </button>
-        <span class="badge badge-antitramp">Anti-Trampa Verificado</span>
+  <!-- WELCOME / BRIEFING -->
+  <section id="welcome-screen" class="screen">
+    <div class="welcome-layout">
+      <div class="welcome-card">
+        <h2 class="welcome-title">¡Bienvenido a la arena!</h2>
+        <div class="welcome-text">
+          <p>Tu misión es simple: cuando escuches el sonido y veas el botón iluminarse… ¡golpéalo sin piedad!</p>
+          <p>Tienes <strong>10 rondas</strong> para demostrar que tus reflejos son más rápidos que los de cualquiera. El más veloz se lleva el oro.</p>
+          <p>¿Estás listo, campeón?</p>
+        </div>
       </div>
+      <button class="btn btn-primary btn-lg btn-block" id="btn-continue-tournament">
+        CONTINUAR CON EL TORNEO
+      </button>
     </div>
   </section>
 
@@ -1787,6 +1852,7 @@
   <!-- Nav dev -->
   <nav class="nav-dev" aria-label="Navegación de prueba">
     <button onclick="showScreen('home-screen')" data-screen="home-screen" class="active">Home</button>
+    <button onclick="showScreen('welcome-screen')" data-screen="welcome-screen">Welcome</button>
     <button onclick="showScreen('countdown-screen')" data-screen="countdown-screen">Countdown</button>
     <button onclick="showScreen('game-screen')" data-screen="game-screen">Game</button>
     <button onclick="showScreen('result-screen')" data-screen="result-screen">Result</button>
@@ -1795,6 +1861,7 @@
   <script>
     const SCREENS = [
       'home-screen',
+      'welcome-screen',
       'countdown-screen',
       'game-screen',
       'result-screen'
@@ -2117,15 +2184,10 @@
       });
 
       const homeScreen = document.getElementById('home-screen');
-      const musicHint = document.getElementById('home-music-hint');
-      if (musicHint && IS_FILE_PROTOCOL) {
-        musicHint.hidden = false;
-      }
       if (homeScreen) {
         homeScreen.addEventListener('pointerdown', function () {
           if (!homeMusicMuted && homeMusicVolume > 0) {
             playHomeMusic();
-            if (musicHint) musicHint.hidden = true;
           }
         });
       }
@@ -2244,7 +2306,7 @@
     }
 
     function syncHomeMusic(screenId) {
-      if (screenId === 'home-screen') {
+      if (screenId === 'home-screen' || screenId === 'welcome-screen') {
         preloadCustomSounds().then(playHomeMusic);
       } else {
         stopHomeMusic();
@@ -3142,6 +3204,10 @@
 
       document.getElementById('btn-join-tournament').addEventListener('click', function () {
         initAudio();
+        showScreen('welcome-screen');
+      });
+
+      document.getElementById('btn-continue-tournament').addEventListener('click', function () {
         showScreen('countdown-screen');
       });
     }
