@@ -1839,6 +1839,38 @@
       display: none;
     }
 
+    .auth-forgot-link-wrap {
+      text-align: right;
+      margin-top: -0.35rem;
+    }
+
+    .auth-form-hint {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--color-secondary);
+      line-height: 1.5;
+      text-align: center;
+      margin-bottom: 0.25rem;
+    }
+
+    .auth-form-success {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--color-primary);
+      line-height: 1.5;
+      text-align: center;
+    }
+
+    .auth-form-success.is-hidden {
+      display: none;
+    }
+
+    .auth-code-input {
+      text-align: center;
+      letter-spacing: 0.35em;
+      font-size: 1.1rem;
+    }
+
     .home-user-greeting {
       position: fixed;
       top: 1rem;
@@ -1921,6 +1953,7 @@
       </form>
 
       <form class="auth-form is-hidden" id="login-form" novalidate>
+        <p class="auth-form-success is-hidden" id="auth-login-success"></p>
         <div class="auth-field">
           <label class="auth-label" for="login-email">Email</label>
           <input
@@ -1963,7 +1996,106 @@
           </div>
           <span class="auth-field-error" id="login-password-error"></span>
         </div>
+        <p class="auth-forgot-link-wrap">
+          <button type="button" class="auth-switch-link" id="btn-show-forgot">¿Olvidaste tu contraseña?</button>
+        </p>
         <button type="submit" class="auth-submit" id="btn-login-submit">INICIAR SESIÓN</button>
+      </form>
+
+      <form class="auth-form is-hidden" id="forgot-request-form" novalidate>
+        <p class="auth-form-hint">Te enviaremos un código a tu correo para restablecer tu contraseña.</p>
+        <div class="auth-field">
+          <label class="auth-label" for="forgot-email">Email</label>
+          <input
+            class="auth-input"
+            type="email"
+            id="forgot-email"
+            placeholder="tu@email.com"
+            autocomplete="email"
+          >
+          <span class="auth-field-error" id="forgot-email-error"></span>
+        </div>
+        <button type="submit" class="auth-submit" id="btn-forgot-send">ENVIAR CÓDIGO</button>
+      </form>
+
+      <form class="auth-form is-hidden" id="forgot-reset-form" novalidate>
+        <p class="auth-form-hint" id="forgot-reset-hint">Ingresa el código que recibiste y tu nueva contraseña.</p>
+        <div class="auth-field">
+          <label class="auth-label" for="forgot-code">Código de verificación</label>
+          <input
+            class="auth-input auth-code-input"
+            type="text"
+            id="forgot-code"
+            placeholder="00000000"
+            inputmode="numeric"
+            maxlength="8"
+            autocomplete="one-time-code"
+          >
+          <span class="auth-field-error" id="forgot-code-error"></span>
+        </div>
+        <div class="auth-field">
+          <label class="auth-label" for="forgot-new-password">Nueva contraseña</label>
+          <div class="auth-password-wrap">
+            <input
+              class="auth-input"
+              type="password"
+              id="forgot-new-password"
+              placeholder="••••••••"
+              autocomplete="new-password"
+            >
+            <button
+              type="button"
+              class="auth-password-toggle"
+              data-target="forgot-new-password"
+              aria-label="Mostrar contraseña"
+              aria-pressed="false"
+            >
+              <svg class="eye-on" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+              <svg class="eye-off" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-10-8-10-8a18.45 18.45 0 0 1 5.06-5.94"></path>
+                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19"></path>
+                <path d="M1 1l22 22"></path>
+                <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"></path>
+              </svg>
+            </button>
+          </div>
+          <span class="auth-field-error" id="forgot-new-password-error"></span>
+        </div>
+        <div class="auth-field">
+          <label class="auth-label" for="forgot-confirm-password">Confirmar contraseña</label>
+          <div class="auth-password-wrap">
+            <input
+              class="auth-input"
+              type="password"
+              id="forgot-confirm-password"
+              placeholder="••••••••"
+              autocomplete="new-password"
+            >
+            <button
+              type="button"
+              class="auth-password-toggle"
+              data-target="forgot-confirm-password"
+              aria-label="Mostrar contraseña"
+              aria-pressed="false"
+            >
+              <svg class="eye-on" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+              <svg class="eye-off" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-10-8-10-8a18.45 18.45 0 0 1 5.06-5.94"></path>
+                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19"></path>
+                <path d="M1 1l22 22"></path>
+                <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"></path>
+              </svg>
+            </button>
+          </div>
+          <span class="auth-field-error" id="forgot-confirm-password-error"></span>
+        </div>
+        <button type="submit" class="auth-submit" id="btn-forgot-reset">CAMBIAR CONTRASEÑA</button>
       </form>
 
       <p class="auth-switch" id="auth-switch-register">
@@ -1973,6 +2105,9 @@
       <p class="auth-switch is-hidden" id="auth-switch-login">
         ¿No tienes cuenta?
         <button type="button" class="auth-switch-link" id="btn-show-register">Regístrate</button>
+      </p>
+      <p class="auth-switch is-hidden" id="auth-switch-forgot">
+        <button type="button" class="auth-switch-link" id="btn-back-login">Volver a iniciar sesión</button>
       </p>
     </div>
   </section>
@@ -2243,6 +2378,16 @@
     let supabaseClient = null;
     let currentUserId = null;
     let leaderboardCache = [];
+    let resetPasswordEmail = '';
+
+    function getAuthRedirectUrl() {
+      const cfg = window.TAPBEAT_SUPABASE || {};
+      if (cfg.redirectUrl) return cfg.redirectUrl;
+      if (location.origin && location.origin.indexOf('http') === 0) {
+        return location.origin + location.pathname;
+      }
+      return 'https://ss12322.github.io/tapbeat-reflex-arena/';
+    }
 
     function initSupabaseClient() {
       const cfg = window.TAPBEAT_SUPABASE || {};
@@ -2274,6 +2419,12 @@
       }
       if (msg.indexOf('email not confirmed') !== -1) {
         return 'Confirma tu email antes de iniciar sesión';
+      }
+      if (msg.indexOf('otp') !== -1 && msg.indexOf('expired') !== -1) {
+        return 'El código expiró. Solicita uno nuevo';
+      }
+      if (msg.indexOf('invalid') !== -1 && msg.indexOf('token') !== -1) {
+        return 'Código inválido. Revisa e intenta de nuevo';
       }
       return (error && error.message) ? error.message : 'Error de conexión con el servidor';
     }
@@ -2356,8 +2507,29 @@
       return data.session;
     }
 
+    async function requestPasswordResetCode(email) {
+      const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+        redirectTo: getAuthRedirectUrl()
+      });
+      if (error) throw error;
+    }
+
+    async function resetPasswordWithCode(email, code, newPassword) {
+      const { error: verifyError } = await supabaseClient.auth.verifyOtp({
+        email: email,
+        token: code,
+        type: 'recovery'
+      });
+      if (verifyError) throw verifyError;
+
+      const { error: updateError } = await supabaseClient.auth.updateUser({
+        password: newPassword
+      });
+      if (updateError) throw updateError;
+    }
+
     function setAuthLoading(isLoading) {
-      ['btn-register-submit', 'btn-login-submit'].forEach(function (id) {
+      ['btn-register-submit', 'btn-login-submit', 'btn-forgot-send', 'btn-forgot-reset'].forEach(function (id) {
         const btn = document.getElementById(id);
         if (btn) btn.disabled = isLoading;
       });
@@ -2421,14 +2593,34 @@
       return '';
     }
 
+    function validateResetCode(value) {
+      const clean = String(value).replace(/\s/g, '');
+      if (!clean) return 'El código es obligatorio';
+      if (!/^\d{6,8}$/.test(clean)) return 'Ingresa el código de 6 a 8 dígitos';
+      return '';
+    }
+
     function showAuthForm(mode) {
-      const isLogin = mode === 'login';
-      document.getElementById('register-form').classList.toggle('is-hidden', isLogin);
-      document.getElementById('login-form').classList.toggle('is-hidden', !isLogin);
-      document.getElementById('auth-switch-register').classList.toggle('is-hidden', isLogin);
-      document.getElementById('auth-switch-login').classList.toggle('is-hidden', !isLogin);
+      document.getElementById('register-form').classList.toggle('is-hidden', mode !== 'register');
+      document.getElementById('login-form').classList.toggle('is-hidden', mode !== 'login');
+      document.getElementById('forgot-request-form').classList.toggle('is-hidden', mode !== 'forgot-request');
+      document.getElementById('forgot-reset-form').classList.toggle('is-hidden', mode !== 'forgot-reset');
+      document.getElementById('auth-switch-register').classList.toggle('is-hidden', mode !== 'register');
+      document.getElementById('auth-switch-login').classList.toggle('is-hidden', mode !== 'login');
+      document.getElementById('auth-switch-forgot').classList.toggle('is-hidden', mode !== 'forgot-request' && mode !== 'forgot-reset');
+
+      if (mode !== 'login') {
+        const successEl = document.getElementById('auth-login-success');
+        if (successEl) {
+          successEl.textContent = '';
+          successEl.classList.add('is-hidden');
+        }
+      }
+
       clearAuthErrors('register-form');
       clearAuthErrors('login-form');
+      clearAuthErrors('forgot-request-form');
+      clearAuthErrors('forgot-reset-form');
     }
 
     function enterHomeFromAuth(username, email, userId) {
@@ -2481,6 +2673,100 @@
 
       document.getElementById('btn-show-register').addEventListener('click', function () {
         showAuthForm('register');
+      });
+
+      document.getElementById('btn-show-forgot').addEventListener('click', function () {
+        showAuthForm('forgot-request');
+      });
+
+      document.getElementById('btn-back-login').addEventListener('click', function () {
+        showAuthForm('login');
+      });
+
+      document.getElementById('forgot-request-form').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        clearAuthErrors('forgot-request-form');
+
+        if (!supabaseClient) {
+          setAuthFieldError('forgot-email', 'forgot-email-error', 'Servidor no configurado. Revisa supabase-config.js');
+          return;
+        }
+
+        const email = document.getElementById('forgot-email').value.trim();
+        const emailError = validateEmail(email);
+        if (emailError) {
+          setAuthFieldError('forgot-email', 'forgot-email-error', emailError);
+          return;
+        }
+
+        setAuthLoading(true);
+        try {
+          await requestPasswordResetCode(email);
+          resetPasswordEmail = email;
+          document.getElementById('forgot-reset-hint').textContent =
+            'Código enviado a ' + email + '. Revisa tu bandeja (y spam).';
+          document.getElementById('forgot-code').value = '';
+          document.getElementById('forgot-new-password').value = '';
+          document.getElementById('forgot-confirm-password').value = '';
+          showAuthForm('forgot-reset');
+        } catch (err) {
+          setAuthFieldError('forgot-email', 'forgot-email-error', mapSupabaseAuthError(err));
+        } finally {
+          setAuthLoading(false);
+        }
+      });
+
+      document.getElementById('forgot-reset-form').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        clearAuthErrors('forgot-reset-form');
+
+        if (!supabaseClient) {
+          setAuthFieldError('forgot-code', 'forgot-code-error', 'Servidor no configurado. Revisa supabase-config.js');
+          return;
+        }
+
+        const code = document.getElementById('forgot-code').value.trim();
+        const newPassword = document.getElementById('forgot-new-password').value;
+        const confirmPassword = document.getElementById('forgot-confirm-password').value;
+
+        const codeError = validateResetCode(code);
+        const passwordError = validatePassword(newPassword);
+        let confirmError = '';
+        if (!confirmPassword) confirmError = 'Confirma tu nueva contraseña';
+        else if (confirmPassword !== newPassword) confirmError = 'Las contraseñas no coinciden';
+
+        if (codeError) setAuthFieldError('forgot-code', 'forgot-code-error', codeError);
+        if (passwordError) setAuthFieldError('forgot-new-password', 'forgot-new-password-error', passwordError);
+        if (confirmError) setAuthFieldError('forgot-confirm-password', 'forgot-confirm-password-error', confirmError);
+        if (codeError || passwordError || confirmError) return;
+
+        if (!resetPasswordEmail) {
+          setAuthFieldError('forgot-code', 'forgot-code-error', 'Sesión de recuperación expirada. Solicita un código nuevo.');
+          showAuthForm('forgot-request');
+          return;
+        }
+
+        setAuthLoading(true);
+        try {
+          await resetPasswordWithCode(resetPasswordEmail, code.replace(/\s/g, ''), newPassword);
+          await supabaseClient.auth.signOut();
+          clearSession();
+
+          document.getElementById('login-email').value = resetPasswordEmail;
+          document.getElementById('login-password').value = '';
+          resetPasswordEmail = '';
+          showAuthForm('login');
+
+          const successEl = document.getElementById('auth-login-success');
+          if (successEl) {
+            successEl.textContent = 'Contraseña actualizada. Inicia sesión con tu nueva contraseña.';
+            successEl.classList.remove('is-hidden');
+          }
+        } catch (err) {
+          setAuthFieldError('forgot-code', 'forgot-code-error', mapSupabaseAuthError(err));
+        } finally {
+          setAuthLoading(false);
+        }
       });
 
       document.getElementById('register-form').addEventListener('submit', async function (e) {
@@ -2561,7 +2847,7 @@
         }
       });
 
-      ['register-username', 'register-email', 'register-password', 'login-email', 'login-password'].forEach(function (id) {
+      ['register-username', 'register-email', 'register-password', 'login-email', 'login-password', 'forgot-email', 'forgot-code', 'forgot-new-password', 'forgot-confirm-password'].forEach(function (id) {
         const input = document.getElementById(id);
         if (!input) return;
         input.addEventListener('input', function () {

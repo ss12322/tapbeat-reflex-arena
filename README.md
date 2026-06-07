@@ -122,6 +122,25 @@ window.TAPBEAT_SUPABASE = {
 
 En **Authentication → Providers → Email**, desactiva **Confirm email** para que el registro entre directo al juego sin confirmar correo.
 
+### 4. Recuperar contraseña por código (email)
+
+Para que el correo envíe un **código numérico** (y no solo un enlace):
+
+1. Ve a **Authentication → Email Templates → Reset password**.
+2. Reemplaza el contenido por algo como:
+
+```html
+<h2>Restablecer contraseña — TAPBEAT</h2>
+<p>Tu código de verificación es:</p>
+<p style="font-size: 28px; letter-spacing: 4px; font-weight: bold;">{{ .Token }}</p>
+<p>Ingresa este código en el juego para crear una nueva contraseña.</p>
+<p>El código expira en 1 hora.</p>
+```
+
+3. Guarda la plantilla.
+
+En el juego: **Inicia sesión → ¿Olvidaste tu contraseña? → Enviar código → ingresar código y nueva contraseña**.
+
 ### Qué se guarda en el servidor
 
 | Tabla | Contenido |
