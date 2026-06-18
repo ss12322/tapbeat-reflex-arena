@@ -8,7 +8,7 @@ window.TAPBEAT_CHAIN = {
   blockExplorer: 'https://celo-sepolia.blockscout.com',
 
   // Vacío = modo demo (sin pago on-chain). Tras deploy, pega la dirección aquí.
-  contractAddress: '',
+  contractAddress: '0x04d15bdc79e61163EcB7C61a7660a70f0f608aF8',
 
   tokens: {
     USDm: {
