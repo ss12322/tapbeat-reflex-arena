@@ -298,7 +298,135 @@
       width: 100%;
     }
 
-    /* ── Botón circular principal ── */
+    /* ══════════════════════════════════
+       COLORES DEL TAP — FEEDBACK VISUAL
+       ══════════════════════════════════ */
+
+    /* ── Screen flash overlay ── */
+    #tap-flash {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 998;
+      opacity: 0;
+      border-radius: 0;
+    }
+    #tap-flash.flash-great {
+      animation: flash-great 0.22s ease-out forwards;
+    }
+    #tap-flash.flash-good {
+      animation: flash-good 0.22s ease-out forwards;
+    }
+    #tap-flash.flash-ok {
+      animation: flash-ok 0.22s ease-out forwards;
+    }
+    #tap-flash.flash-miss {
+      animation: flash-miss-color 0.28s ease-out forwards;
+    }
+    @keyframes flash-great {
+      0%   { opacity: 0.18; background: radial-gradient(ellipse at center, rgba(0,255,136,0.35) 0%, transparent 70%); }
+      100% { opacity: 0; background: radial-gradient(ellipse at center, rgba(0,255,136,0) 0%, transparent 70%); }
+    }
+    @keyframes flash-good {
+      0%   { opacity: 0.15; background: radial-gradient(ellipse at center, rgba(0,212,255,0.3) 0%, transparent 70%); }
+      100% { opacity: 0; background: radial-gradient(ellipse at center, rgba(0,212,255,0) 0%, transparent 70%); }
+    }
+    @keyframes flash-ok {
+      0%   { opacity: 0.12; background: radial-gradient(ellipse at center, rgba(255,170,0,0.25) 0%, transparent 70%); }
+      100% { opacity: 0; }
+    }
+    @keyframes flash-miss-color {
+      0%   { opacity: 0.22; background: radial-gradient(ellipse at center, rgba(255,51,85,0.35) 0%, transparent 70%); }
+      100% { opacity: 0; }
+    }
+
+    /* ── Tap button color states ── */
+    .btn-circle.tap-great {
+      background: rgba(0,255,136,0.25) !important;
+      border-color: var(--color-primary) !important;
+      color: var(--color-primary) !important;
+      box-shadow: 0 0 60px rgba(0,255,136,0.8), 0 0 120px rgba(0,255,136,0.3) !important;
+      transform: scale(0.93) !important;
+    }
+    .btn-circle.tap-good {
+      background: rgba(0,212,255,0.2) !important;
+      border-color: var(--color-secondary) !important;
+      color: var(--color-secondary) !important;
+      box-shadow: 0 0 50px rgba(0,212,255,0.7) !important;
+      transform: scale(0.94) !important;
+    }
+    .btn-circle.tap-ok {
+      background: rgba(255,170,0,0.18) !important;
+      border-color: var(--color-warning) !important;
+      color: var(--color-warning) !important;
+      box-shadow: 0 0 40px rgba(255,170,0,0.6) !important;
+      transform: scale(0.95) !important;
+    }
+    .btn-circle.tap-miss {
+      background: rgba(255,51,85,0.18) !important;
+      border-color: var(--color-danger) !important;
+      color: var(--color-danger) !important;
+      box-shadow: 0 0 40px rgba(255,51,85,0.6) !important;
+    }
+
+    /* ── Click ripple effect ── */
+    .tap-ripple {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      animation: ripple-out 0.5s ease-out forwards;
+      transform: translate(-50%, -50%);
+    }
+    @keyframes ripple-out {
+      0%   { width: 0; height: 0; opacity: 0.7; }
+      100% { width: 300px; height: 300px; opacity: 0; }
+    }
+    .ripple-great { border: 2px solid rgba(0,255,136,0.6); }
+    .ripple-good  { border: 2px solid rgba(0,212,255,0.6); }
+    .ripple-ok    { border: 2px solid rgba(255,170,0,0.5); }
+    .ripple-miss  { border: 2px solid rgba(255,51,85,0.5); }
+
+    /* ── Score popup floating text ── */
+    .score-popup {
+      position: fixed;
+      font-family: var(--font-display);
+      font-size: 2rem;
+      letter-spacing: 0.08em;
+      pointer-events: none;
+      z-index: 997;
+      animation: score-float 0.8s ease-out forwards;
+      text-shadow: 0 0 20px currentColor;
+    }
+    .score-popup.great { color: var(--color-primary); }
+    .score-popup.good  { color: var(--color-secondary); }
+    .score-popup.ok    { color: var(--color-warning); }
+    .score-popup.miss  { color: var(--color-danger); }
+    @keyframes score-float {
+      0%   { opacity: 1; transform: translateY(0) scale(1); }
+      40%  { opacity: 1; transform: translateY(-30px) scale(1.1); }
+      100% { opacity: 0; transform: translateY(-70px) scale(0.8); }
+    }
+
+    /* ── Game area border flash ── */
+    #game-area {
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    #game-area.area-great {
+      border-color: rgba(0,255,136,0.6) !important;
+      box-shadow: 0 0 30px rgba(0,255,136,0.2), inset 0 0 30px rgba(0,255,136,0.05) !important;
+    }
+    #game-area.area-good {
+      border-color: rgba(0,212,255,0.5) !important;
+      box-shadow: 0 0 25px rgba(0,212,255,0.18) !important;
+    }
+    #game-area.area-ok {
+      border-color: rgba(255,170,0,0.45) !important;
+      box-shadow: 0 0 20px rgba(255,170,0,0.15) !important;
+    }
+    #game-area.area-miss {
+      border-color: rgba(255,51,85,0.5) !important;
+      box-shadow: 0 0 25px rgba(255,51,85,0.2) !important;
+    }
     .btn-circle {
       position: relative;
       width: 140px;
@@ -1274,6 +1402,151 @@
       border-color: var(--color-primary);
     }
 
+    /* ══════════════════════════════════
+       MECANISMOS PSICOLÓGICOS DE ADICCIÓN
+       ══════════════════════════════════ */
+
+    /* ── PSYCH 1: ALMOST-WIN BANNER ── */
+    #almost-win-banner {
+      display: none;
+      width: 100%;
+      max-width: 440px;
+      background: linear-gradient(135deg, rgba(255,51,85,0.12), rgba(255,170,0,0.08));
+      border: 1px solid rgba(255,51,85,0.5);
+      border-radius: var(--radius-md);
+      padding: 1rem 1.25rem;
+      text-align: center;
+      animation: almost-pulse 2s ease infinite;
+      margin-bottom: 0.5rem;
+    }
+    #almost-win-banner.visible { display: block; }
+    @keyframes almost-pulse {
+      0%,100% { border-color: rgba(255,51,85,0.5); box-shadow: none; }
+      50% { border-color: rgba(255,51,85,0.9); box-shadow: 0 0 20px rgba(255,51,85,0.2); }
+    }
+    .almost-win-title {
+      font-family: var(--font-display);
+      font-size: 1.4rem;
+      letter-spacing: 0.1em;
+      color: var(--color-danger);
+      margin-bottom: 0.35rem;
+    }
+    .almost-win-detail {
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      line-height: 1.5;
+    }
+    .almost-win-pts { color: var(--color-warning); font-weight: 700; }
+
+    /* ── PSYCH 2: STREAK FIRE OVERLAY ── */
+    #streak-fire-overlay {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: var(--font-display);
+      letter-spacing: 0.08em;
+      pointer-events: none;
+      z-index: 999;
+      opacity: 0;
+      text-align: center;
+      line-height: 1.1;
+    }
+    #streak-fire-overlay.fire-show {
+      animation: fire-appear 1.4s ease forwards;
+    }
+    #streak-fire-overlay.tier-3  { font-size: 3rem; color: var(--color-warning); text-shadow: 0 0 30px rgba(255,170,0,0.7); }
+    #streak-fire-overlay.tier-5  { font-size: 3.75rem; color: #ff8800; text-shadow: 0 0 40px rgba(255,136,0,0.8); }
+    #streak-fire-overlay.tier-7  { font-size: 4.5rem; color: var(--color-danger); text-shadow: 0 0 50px rgba(255,51,85,0.9); }
+    #streak-fire-overlay.tier-10 { font-size: 5.5rem; color: var(--color-primary); text-shadow: 0 0 60px rgba(0,255,136,0.9); }
+    @keyframes fire-appear {
+      0%   { opacity: 0; transform: translate(-50%,-50%) scale(0.4); }
+      18%  { opacity: 1; transform: translate(-50%,-50%) scale(1.12); }
+      55%  { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+      100% { opacity: 0; transform: translate(-50%,-65%) scale(0.88); }
+    }
+
+    /* ── PSYCH 2: STREAK STAT HOT STATE ── */
+    .stat-card-value.streak-hot {
+      animation: streak-bump 0.25s ease;
+    }
+    @keyframes streak-bump {
+      0%   { transform: scale(1); }
+      50%  { transform: scale(1.35); color: var(--color-warning); }
+      100% { transform: scale(1); }
+    }
+
+    /* ── PSYCH 3: PLAYERS ONLINE BADGE ── */
+    #players-online-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.7rem;
+      letter-spacing: 0.1em;
+      color: var(--color-text-muted);
+      padding: 0.4rem 0.9rem;
+      background: rgba(0,255,136,0.05);
+      border: 1px solid rgba(0,255,136,0.2);
+      border-radius: var(--radius-full);
+      width: fit-content;
+      align-self: center;
+    }
+    .online-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--color-primary);
+      box-shadow: 0 0 6px var(--color-primary);
+      animation: dot-blink 1.5s ease infinite;
+      flex-shrink: 0;
+    }
+    @keyframes dot-blink { 0%,100%{opacity:1} 50%{opacity:0.25} }
+    #online-count-val { color: var(--color-primary); font-weight: 700; }
+
+    /* ── PSYCH 3: TOURNAMENT TIMER ── */
+    #tourney-countdown {
+      font-size: 0.68rem;
+      letter-spacing: 0.1em;
+      color: var(--color-text-muted);
+      text-align: center;
+      text-transform: uppercase;
+    }
+    #tourney-countdown-val {
+      font-family: var(--font-display);
+      font-size: 1rem;
+      letter-spacing: 0.05em;
+      color: var(--color-danger);
+    }
+
+    /* ── PSYCH 3: ACTIVITY FEED ── */
+    #activity-feed {
+      width: 100%;
+      max-width: 420px;
+      height: 26px;
+      overflow: hidden;
+      position: relative;
+      align-self: center;
+    }
+    .feed-item {
+      position: absolute;
+      width: 100%;
+      text-align: center;
+      font-size: 0.68rem;
+      letter-spacing: 0.05em;
+      color: var(--color-text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      animation: feed-slide 4.2s ease forwards;
+    }
+    @keyframes feed-slide {
+      0%   { opacity: 0; transform: translateY(10px); }
+      12%  { opacity: 1; transform: translateY(0); }
+      75%  { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(-10px); }
+    }
+    .feed-name  { color: var(--color-primary); font-weight: 700; }
+    .feed-money { color: var(--color-warning); font-weight: 700; }
+
     /* ── Home ── */
     #home-screen {
       justify-content: flex-start;
@@ -2112,6 +2385,12 @@
     </div>
   </section>
 
+  <!-- TAP COLOR FLASH OVERLAY -->
+  <div id="tap-flash" aria-hidden="true"></div>
+
+  <!-- PSYCH 2: Streak fire overlay (fixed, global) -->
+  <div id="streak-fire-overlay" aria-hidden="true"></div>
+
   <!-- HOME -->
   <section id="home-screen" class="screen">
     <span class="home-user-greeting" id="home-user-greeting" hidden></span>
@@ -2120,32 +2399,9 @@
       <p class="home-subtitle">REFLEX ARENA · AUDIO EDITION</p>
     </header>
 
-    <div class="home-music-controls" id="home-music-controls">
-      <span class="home-music-label">Música</span>
-      <input
-        type="range"
-        class="home-music-slider"
-        id="home-music-volume"
-        min="0"
-        max="100"
-        value="50"
-        aria-label="Volumen de música"
-      >
-      <span class="home-music-value" id="home-music-value">50%</span>
-      <button
-        type="button"
-        class="music-mute-btn"
-        id="btn-music-mute"
-        aria-label="Silenciar música"
-        aria-pressed="false"
-        title="Silenciar"
-      >
-        <span class="music-mute-icon music-mute-icon--on" aria-hidden="true">♪</span>
-        <span class="music-mute-icon music-mute-icon--off" aria-hidden="true">✕</span>
-      </button>
-    </div>
-
     <div class="home-stack">
+
+      <!-- 1. PRIZE POOL — lo primero que ve el usuario -->
       <div class="card" id="prize-pool-card">
         <div class="card-header">
           <span class="card-title">Prize Pool</span>
@@ -2175,6 +2431,7 @@
         </div>
       </div>
 
+      <!-- 2. CTA PRINCIPAL — call to action inmediato -->
       <div class="home-actions">
         <button class="btn btn-primary btn-lg btn-block" id="btn-join-tournament">
           UNIRSE AL TORNEO
@@ -2182,6 +2439,40 @@
         <span class="badge badge-antitramp">Anti-Trampa Verificado</span>
       </div>
 
+      <!-- 3. PRUEBA SOCIAL — jugadores, timer, feed y música -->
+      <div id="players-online-badge">
+        <span class="online-dot"></span>
+        <span id="online-count-val">23</span>&nbsp;jugadores en línea ahora
+      </div>
+      <div id="tourney-countdown">⏰ Torneo cierra en <span id="tourney-countdown-val">14:32</span></div>
+      <div id="activity-feed"></div>
+
+      <div class="home-music-controls" id="home-music-controls">
+        <span class="home-music-label">Música</span>
+        <input
+          type="range"
+          class="home-music-slider"
+          id="home-music-volume"
+          min="0"
+          max="100"
+          value="50"
+          aria-label="Volumen de música"
+        >
+        <span class="home-music-value" id="home-music-value">50%</span>
+        <button
+          type="button"
+          class="music-mute-btn"
+          id="btn-music-mute"
+          aria-label="Silenciar música"
+          aria-pressed="false"
+          title="Silenciar"
+        >
+          <span class="music-mute-icon music-mute-icon--on" aria-hidden="true">♪</span>
+          <span class="music-mute-icon music-mute-icon--off" aria-hidden="true">✕</span>
+        </button>
+      </div>
+
+      <!-- 4. LEADERBOARD — al final para no distraer del CTA -->
       <div class="card">
         <div class="card-header">
           <span class="card-title">Leaderboard</span>
@@ -2200,6 +2491,7 @@
           <tbody id="leaderboard-body"></tbody>
         </table>
       </div>
+
     </div>
   </section>
 
@@ -2306,6 +2598,13 @@
   <!-- RESULT -->
   <section id="result-screen" class="screen">
     <div class="result-panel" id="result-panel">
+      <!-- PSYCH 1: Almost-win banner -->
+      <div id="almost-win-banner">
+        <div class="almost-win-title">😤 ¡CASI LO LOGRAS!</div>
+        <div class="almost-win-detail">Te faltaron <span class="almost-win-pts" id="almost-win-pts">0</span> puntos para ganar <span class="almost-win-pts" id="almost-win-prize">$0.76 cUSD</span> — ¡juega de nuevo!</div>
+      </div>
+      <!-- /PSYCH 1 -->
+
       <div id="result-suspicious" role="alert">
         Resultado marcado como sospechoso — posible uso de bot
       </div>
@@ -3587,6 +3886,7 @@
       if (roundFeedbackTimer) { clearTimeout(roundFeedbackTimer); roundFeedbackTimer = null; }
       if (gameElapsedInterval) { clearInterval(gameElapsedInterval); gameElapsedInterval = null; }
       gameState.soundActive = false;
+      stopTensionAudio();
       stopSignalSound();
     }
 
@@ -3604,6 +3904,181 @@
         signalNodes = null;
       }
     }
+
+    /* ══════════════════════════════════
+       SISTEMA DE TENSIÓN PSICOLÓGICA
+       3 capas: drone + pulso acelerado + silencio
+       ══════════════════════════════════ */
+
+    var tensionNodes = null;
+    var tensionPulseTimer = null;
+    var tensionActive = false;
+
+    function stopTensionAudio() {
+      tensionActive = false;
+
+      // Limpiar timers de pulso
+      if (tensionPulseTimer) {
+        clearTimeout(tensionPulseTimer);
+        tensionPulseTimer = null;
+      }
+
+      if (!tensionNodes) return;
+
+      var t = audioCtx ? audioCtx.currentTime : 0;
+
+      // Fade out suave del drone
+      try {
+        if (tensionNodes.droneGain) {
+          tensionNodes.droneGain.gain.cancelScheduledValues(t);
+          tensionNodes.droneGain.gain.setValueAtTime(
+            tensionNodes.droneGain.gain.value, t
+          );
+          tensionNodes.droneGain.gain.linearRampToValueAtTime(0, t + 0.15);
+        }
+        if (tensionNodes.subGain) {
+          tensionNodes.subGain.gain.cancelScheduledValues(t);
+          tensionNodes.subGain.gain.setValueAtTime(
+            tensionNodes.subGain.gain.value, t
+          );
+          tensionNodes.subGain.gain.linearRampToValueAtTime(0, t + 0.15);
+        }
+      } catch(e) {}
+
+      setTimeout(function() {
+        if (!tensionNodes) return;
+        try {
+          if (tensionNodes.drone)  tensionNodes.drone.stop();
+          if (tensionNodes.sub)    tensionNodes.sub.stop();
+        } catch(e) {}
+        tensionNodes = null;
+      }, 180);
+    }
+
+    function startTensionAudio(totalDelayMs) {
+      stopTensionAudio();
+      if (!audioCtx) return;
+      if (audioCtx.state === 'suspended') return;
+
+      tensionActive = true;
+      var ctx = audioCtx;
+      var t = ctx.currentTime;
+      var dur = totalDelayMs / 1000;
+
+      // ── CAPA 1: Drone subsónico (55Hz) ──
+      // Frecuencia baja que el cuerpo siente físicamente
+      // Activa el sistema nervioso antes de que el cerebro lo procese
+      var drone = ctx.createOscillator();
+      var droneGain = ctx.createGain();
+      var droneFilter = ctx.createBiquadFilter();
+
+      drone.type = 'sine';
+      drone.frequency.setValueAtTime(55, t);
+      // Sube muy levemente hacia el final para crear sensación de "algo se acerca"
+      drone.frequency.linearRampToValueAtTime(72, t + dur * 0.85);
+
+      droneFilter.type = 'lowpass';
+      droneFilter.frequency.value = 200;
+
+      droneGain.gain.setValueAtTime(0, t);
+      droneGain.gain.linearRampToValueAtTime(0.06, t + 0.4);
+      // Crece suavemente durante toda la espera
+      droneGain.gain.linearRampToValueAtTime(0.12, t + dur * 0.8);
+      // Silencio total 150ms antes del beat — el corte más efectivo
+      droneGain.gain.linearRampToValueAtTime(0, t + dur - 0.15);
+
+      drone.connect(droneFilter);
+      droneFilter.connect(droneGain);
+      droneGain.connect(ctx.destination);
+      drone.start(t);
+      drone.stop(t + dur + 0.1);
+
+      // ── CAPA 2: Sub-drone armónico (110Hz) ──
+      // Refuerza la tensión con el segundo armónico del drone
+      var sub = ctx.createOscillator();
+      var subGain = ctx.createGain();
+
+      sub.type = 'triangle';
+      sub.frequency.setValueAtTime(110, t);
+      sub.frequency.linearRampToValueAtTime(144, t + dur * 0.85);
+
+      subGain.gain.setValueAtTime(0, t);
+      subGain.gain.linearRampToValueAtTime(0.035, t + 0.6);
+      subGain.gain.linearRampToValueAtTime(0.055, t + dur * 0.8);
+      subGain.gain.linearRampToValueAtTime(0, t + dur - 0.15);
+
+      sub.connect(subGain);
+      subGain.connect(ctx.destination);
+      sub.start(t);
+      sub.stop(t + dur + 0.1);
+
+      tensionNodes = {
+        drone: drone,
+        droneGain: droneGain,
+        sub: sub,
+        subGain: subGain
+      };
+
+      // ── CAPA 3: Pulso que acelera (entrainment cardíaco) ──
+      // Empieza lento y acelera — sincroniza involuntariamente el ritmo cardíaco
+      // El corazón sigue el ritmo externo: esto es entrainment auditivo-cardíaco
+      var bpm = 52;
+      var bpmTarget = 138;
+      var pulseCount = 0;
+      var elapsed = 0;
+      var silenceZone = dur - 0.15; // últimos 150ms = silencio total
+
+      function schedulePulse() {
+        if (!tensionActive) return;
+        if (elapsed >= silenceZone) return; // silencio antes del beat
+
+        var progress = Math.min(elapsed / (dur * 0.85), 1);
+        // Curva exponencial: empieza suave, acelera dramáticamente al final
+        var currentBpm = bpm + Math.pow(progress, 2.2) * (bpmTarget - bpm);
+        var intervalMs = (60 / currentBpm) * 1000;
+
+        // Tick de pulso — muy sutil, casi imperceptible conscientemente
+        // pero el cerebro lo registra subconscientemente
+        initAudio().then(function(ctx) {
+          if (!tensionActive) return;
+          try {
+            var tickOsc = ctx.createOscillator();
+            var tickGain = ctx.createGain();
+            var tickFilter = ctx.createBiquadFilter();
+
+            tickOsc.type = 'sine';
+            // Frecuencia del tick sube con el BPM — pitch más alto = más urgencia
+            tickOsc.frequency.value = 180 + progress * 220;
+
+            tickFilter.type = 'bandpass';
+            tickFilter.frequency.value = 300;
+            tickFilter.Q.value = 2;
+
+            // Volumen muy bajo — psicológicamente más efectivo que uno fuerte
+            // El cerebro busca el patrón en lugar de ignorar el ruido
+            var vol = 0.018 + progress * 0.028;
+            tickGain.gain.setValueAtTime(vol, ctx.currentTime);
+            tickGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
+
+            tickOsc.connect(tickFilter);
+            tickFilter.connect(tickGain);
+            tickGain.connect(ctx.destination);
+            tickOsc.start(ctx.currentTime);
+            tickOsc.stop(ctx.currentTime + 0.07);
+          } catch(e) {}
+        });
+
+        elapsed += intervalMs / 1000;
+        pulseCount++;
+
+        tensionPulseTimer = setTimeout(schedulePulse, intervalMs);
+      }
+
+      // Primer pulso con pequeño delay inicial
+      tensionPulseTimer = setTimeout(schedulePulse, 600);
+    }
+
+    /* ── End tension audio system ── */
 
     function startSignalSound(durationMs) {
       stopSignalSound();
@@ -3800,6 +4275,9 @@
     function activateSignal() {
       if (gameState.gameOver || roundResolving) return;
 
+      // Corta la tensión — el silencio ya estaba programado, esto es el refuerzo
+      stopTensionAudio();
+
       currentSignalDurationMs = getSignalDurationMs(gameState.round);
       gameState.roundClicks = 0;
       gameState.roundNegativeClicks = 0;
@@ -3846,6 +4324,12 @@
         Math.random() * (ROUND_MAX_DELAY - ROUND_MIN_DELAY);
 
       if (roundDelayTimer) { clearTimeout(roundDelayTimer); roundDelayTimer = null; }
+
+      // Inicia la atmósfera de tensión sincronizada con el delay exacto
+      initAudio().then(function() {
+        startTensionAudio(delay);
+      }).catch(function() {});
+
       roundDelayTimer = setTimeout(activateSignal, delay);
     }
 
@@ -3880,6 +4364,10 @@
       setButtonState(clicks === 0 ? 'wrong' : 'tapped');
       setWaveState('click');
       showFeedback(grade, feedbackText(clicks));
+
+      // Dispara colores del resultado final de la ronda
+      triggerTapColors(grade, clicks === 0 ? 'MISS' : null);
+
       updateGameUI();
 
       if (roundFeedbackTimer) { clearTimeout(roundFeedbackTimer); roundFeedbackTimer = null; }
@@ -3908,6 +4396,8 @@
       btn.classList.add('wrong');
 
       flashMiss();
+      // Color rojo en taps de penalización
+      triggerTapColors('miss', '-' + penalty);
       setAreaLabel(
         type === 'early'
           ? '¡Antes del sonido! -' + penalty
@@ -3938,6 +4428,10 @@
         btn.classList.remove('tapped', 'wrong');
         void btn.offsetWidth;
         btn.classList.add('tapped');
+
+        // Color feedback por clicks acumulados
+        var clickGrade = gameState.roundClicks >= 8 ? 'great' : gameState.roundClicks >= 5 ? 'good' : 'ok';
+        triggerTapColors(clickGrade, '+' + POINTS_PER_CLICK);
 
         setAreaLabel('×' + gameState.roundClicks + ' · ¡sigue!', 'signal');
         showFeedback('great', '+' + POINTS_PER_CLICK);
@@ -4308,6 +4802,233 @@
       }).join('');
     }
 
+    /* ══════════════════════════════════
+       SISTEMA DE COLORES DEL TAP
+       ══════════════════════════════════ */
+
+    var tapFlashEl = document.getElementById('tap-flash');
+
+    /* Determina el grado de color según clicks en la ronda */
+    function getTapColorGrade(clicks) {
+      if (clicks === 0) return 'miss';
+      if (clicks >= 8)  return 'great';
+      if (clicks >= 5)  return 'good';
+      return 'ok';
+    }
+
+    /* Flash de pantalla completa */
+    function triggerScreenFlash(grade) {
+      if (!tapFlashEl) return;
+      tapFlashEl.className = '';
+      void tapFlashEl.offsetWidth;
+      tapFlashEl.className = 'flash-' + grade;
+    }
+
+    /* Color del botón TAP */
+    function colorTapButton(grade) {
+      var btn = document.getElementById('tap-button');
+      if (!btn) return;
+      btn.classList.remove('tap-great','tap-good','tap-ok','tap-miss');
+      btn.classList.add('tap-' + grade);
+      setTimeout(function() {
+        btn.classList.remove('tap-great','tap-good','tap-ok','tap-miss');
+      }, 500);
+    }
+
+    /* Borde del game-area */
+    function colorGameArea(grade) {
+      var area = document.getElementById('game-area');
+      if (!area) return;
+      area.classList.remove('area-great','area-good','area-ok','area-miss');
+      area.classList.add('area-' + grade);
+      setTimeout(function() {
+        area.classList.remove('area-great','area-good','area-ok','area-miss');
+      }, 600);
+    }
+
+    /* Ripple desde el centro del botón */
+    function spawnRipple(grade) {
+      var btn = document.getElementById('tap-button');
+      var area = document.getElementById('game-area');
+      if (!btn || !area) return;
+      var btnRect = btn.getBoundingClientRect();
+      var areaRect = area.getBoundingClientRect();
+      var ripple = document.createElement('div');
+      ripple.className = 'tap-ripple ripple-' + grade;
+      ripple.style.left = (btnRect.left + btnRect.width/2 - areaRect.left) + 'px';
+      ripple.style.top  = (btnRect.top  + btnRect.height/2 - areaRect.top)  + 'px';
+      area.appendChild(ripple);
+      setTimeout(function() { ripple.remove(); }, 500);
+    }
+
+    /* Score popup flotante */
+    function spawnScorePopup(grade, text) {
+      var btn = document.getElementById('tap-button');
+      if (!btn) return;
+      var rect = btn.getBoundingClientRect();
+      var popup = document.createElement('div');
+      popup.className = 'score-popup ' + grade;
+      popup.textContent = text;
+      popup.style.left = (rect.left + rect.width/2 - 30) + 'px';
+      popup.style.top  = (rect.top  - 10) + 'px';
+      document.body.appendChild(popup);
+      setTimeout(function() { popup.remove(); }, 820);
+    }
+
+    /* Función principal — dispara todos los efectos juntos */
+    function triggerTapColors(grade, scoreText) {
+      triggerScreenFlash(grade);
+      colorTapButton(grade);
+      colorGameArea(grade);
+      spawnRipple(grade);
+      if (scoreText) spawnScorePopup(grade, scoreText);
+    }
+
+    /* ── End tap color system ── */
+
+    /* ── PSYCH 1: Almost-win ── */
+    const ALMOST_WIN_THRESHOLDS = [
+      { pts: 700, label: '1er lugar', prize: '$1.90 cUSD' },
+      { pts: 550, label: '2do lugar', prize: '$1.14 cUSD' },
+      { pts: 400, label: '3er lugar', prize: '$0.76 cUSD' }
+    ];
+
+    function checkAlmostWin(score) {
+      var banner = document.getElementById('almost-win-banner');
+      if (!banner) return;
+      for (var i = 0; i < ALMOST_WIN_THRESHOLDS.length; i++) {
+        var t = ALMOST_WIN_THRESHOLDS[i];
+        var diff = t.pts - score;
+        if (diff > 0 && diff <= 150) {
+          document.getElementById('almost-win-pts').textContent = diff;
+          document.getElementById('almost-win-prize').textContent = t.prize;
+          banner.classList.add('visible');
+          return;
+        }
+      }
+      banner.classList.remove('visible');
+    }
+
+    /* ── PSYCH 2: Streak fire ── */
+    function showStreakFire(streak) {
+      var el = document.getElementById('streak-fire-overlay');
+      if (!el) return;
+      var tier = '', text = '';
+      if (streak === 3)  { tier = 'tier-3';  text = '🔥 RACHA x3'; }
+      if (streak === 5)  { tier = 'tier-5';  text = '🔥🔥 RACHA x5'; }
+      if (streak === 7)  { tier = 'tier-7';  text = '💥 RACHA x7'; }
+      if (streak >= 10)  { tier = 'tier-10'; text = '⚡ IMPARABLE!'; }
+      if (!tier) return;
+      el.className = '';
+      el.textContent = '';
+      void el.offsetWidth;
+      el.textContent = text;
+      el.className = tier + ' fire-show';
+    }
+
+    function animateStreakStat() {
+      var statEls = document.querySelectorAll('.stat-card-value');
+      statEls.forEach(function(el) {
+        if (el.closest('.stat-card') && el.closest('.stat-card').querySelector('.stat-card-label') &&
+            el.closest('.stat-card').querySelector('.stat-card-label').textContent.toLowerCase().includes('racha')) {
+          el.classList.remove('streak-hot');
+          void el.offsetWidth;
+          el.classList.add('streak-hot');
+          setTimeout(function() { el.classList.remove('streak-hot'); }, 300);
+        }
+      });
+    }
+
+    /* ── PSYCH 3: Players online counter ── */
+    var onlineCount = 23;
+    function updateOnlineCount() {
+      var delta = Math.random() > 0.45 ? 1 : -1;
+      onlineCount = Math.max(12, Math.min(68, onlineCount + delta));
+      var el = document.getElementById('online-count-val');
+      if (el) el.textContent = onlineCount;
+    }
+    setInterval(updateOnlineCount, 3800);
+
+    /* ── PSYCH 3: Tournament countdown timer ── */
+    var tourneySeconds = 14 * 60 + 32;
+    function updateTourneyTimer() {
+      tourneySeconds--;
+      if (tourneySeconds < 0) tourneySeconds = 18 * 60;
+      var m = Math.floor(tourneySeconds / 60);
+      var s = tourneySeconds % 60;
+      var el = document.getElementById('tourney-countdown-val');
+      if (el) {
+        el.textContent = m + ':' + String(s).padStart(2, '0');
+        el.style.color = tourneySeconds < 60 ? '#ff3355' : tourneySeconds < 180 ? '#ffaa00' : '';
+      }
+    }
+    setInterval(updateTourneyTimer, 1000);
+
+    /* ── PSYCH 3: Activity feed ── */
+    var FEED_NAMES = ['NEON_KING','CyberPulse','GridRunner','PhantomBeat','VoidSync',
+      'CarlosV_CLO','Ana_B','MiguelR','LuisD99','SofiaM','ElRayo','LaVeloz',
+      'TapKing','BeatMstr','ReflexGod','Pipe_K','Mafe22','JuanPx'];
+    var FEED_CITIES = ['Cali','Bogotá','Medellín','Barranquilla','Bucaramanga','Cúcuta'];
+    var feedRunning = false;
+
+    function getFeedMessage() {
+      var name = FEED_NAMES[Math.floor(Math.random() * FEED_NAMES.length)];
+      var city = FEED_CITIES[Math.floor(Math.random() * FEED_CITIES.length)];
+      var clicks = Math.floor(Math.random() * 8) + 6;
+      var pool = (poolBase + Math.random() * 2).toFixed(2);
+      var streak = Math.floor(Math.random() * 5) + 3;
+      var msgs = [
+        '<span class="feed-name">' + name + '</span> de ' + city + ' acaba de entrar al torneo',
+        '⚡ <span class="feed-name">' + name + '</span> logró <span class="feed-money">' + clicks + ' clicks</span> en una ronda',
+        '💰 El prize pool subió a <span class="feed-money">$' + pool + ' cUSD</span>',
+        '🔥 <span class="feed-name">' + name + '</span> lleva una racha de <span class="feed-money">' + streak + '</span> rondas perfectas',
+        '🏆 <span class="feed-name">' + name + '</span> de ' + city + ' lidera el torneo',
+        '⚡ <span class="feed-money">' + (Math.floor(Math.random() * 10) + 8) + '</span> jugadores entraron en los últimos 5 minutos'
+      ];
+      return msgs[Math.floor(Math.random() * msgs.length)];
+    }
+
+    function showNextFeedItem() {
+      if (!feedRunning) return;
+      var feed = document.getElementById('activity-feed');
+      if (!feed) return;
+      var el = document.createElement('div');
+      el.className = 'feed-item';
+      el.innerHTML = getFeedMessage();
+      feed.innerHTML = '';
+      feed.appendChild(el);
+      setTimeout(showNextFeedItem, 4400);
+    }
+
+    function startActivityFeed() {
+      feedRunning = true;
+      setTimeout(showNextFeedItem, 1800);
+    }
+    startActivityFeed();
+
+    /* ─── Hook streak fire into existing game logic ─── */
+    /* Monkey-patch updateGameUI to trigger streak effects */
+    var _origUpdateGameUI = updateGameUI;
+    var _lastKnownStreak = 0;
+    updateGameUI = function() {
+      _origUpdateGameUI.apply(this, arguments);
+      var currentStreak = gameState.streak;
+      if (currentStreak > _lastKnownStreak && currentStreak >= 3) {
+        showStreakFire(currentStreak);
+        animateStreakStat();
+      }
+      _lastKnownStreak = currentStreak;
+    };
+
+    /* ─── Hook almost-win into renderResults ─── */
+    var _origRenderResults = renderResults;
+    renderResults = function(rank) {
+      _origRenderResults.apply(this, arguments);
+      checkAlmostWin(gameState.score);
+    };
+
+    /* ── End psychological mechanisms ── */
+
     function initHome() {
       initHomeMusicControls();
       updatePoolDisplay();
@@ -4583,3 +5304,4 @@
 
 </body>
 </html>
+
