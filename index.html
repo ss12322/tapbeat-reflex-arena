@@ -4024,13 +4024,40 @@
 
     /* ══════════════════════════════════
        SISTEMA DE TENSIÓN PSICOLÓGICA
-       4 capas: drone + armónico + pulso + shepard tone + silencio
+       6 capas envolventes — intensidad escala con la ronda (0→9)
        ══════════════════════════════════ */
 
     var tensionNodes = null;
     var tensionPulseTimer = null;
     var tensionActive = false;
-    var TENSION_SILENCE_SEC = 0.2; // 200ms de silencio total antes del beat
+
+    function getTensionProfile(roundIndex) {
+      var idx = Math.max(0, Math.min(roundIndex, TOTAL_ROUNDS - 1));
+      var p = idx / Math.max(1, TOTAL_ROUNDS - 1);
+
+      return {
+        intensity: p,
+        droneGainStart: 0.05 + p * 0.055,
+        droneGainPeak: 0.11 + p * 0.15,
+        droneFreqStart: 52 - p * 5,
+        droneFreqEnd: 70 + p * 24,
+        subGainPeak: 0.038 + p * 0.06,
+        shepardGainMid: 0.022 + p * 0.04,
+        shepardGainPeak: 0.036 + p * 0.058,
+        shepardFilterEnd: 1100 + p * 1100,
+        bpmStart: 56 + p * 30,
+        bpmTarget: 128 + p * 52,
+        pulseExponent: 1.85 + p * 1.15,
+        pulseVolBase: 0.012 + p * 0.02,
+        pulseVolRange: 0.02 + p * 0.034,
+        tickFreqBase: 150 + p * 90,
+        tickFreqRange: 190 + p * 340,
+        ambientGainPeak: 0.01 + p * 0.032,
+        noiseBedPeak: 0.005 + p * 0.028,
+        silenceSec: 0.22 - p * 0.05,
+        panSpread: 0.5 + p * 0.4
+      };
+    }
 
     function stopTensionAudio() {
       tensionActive = false;
@@ -4045,26 +4072,35 @@
       var t = audioCtx ? audioCtx.currentTime : 0;
 
       try {
+        if (tensionNodes.master) {
+          tensionNodes.master.gain.cancelScheduledValues(t);
+          tensionNodes.master.gain.setValueAtTime(tensionNodes.master.gain.value, t);
+          tensionNodes.master.gain.linearRampToValueAtTime(0, t + 0.15);
+        }
         if (tensionNodes.droneGain) {
           tensionNodes.droneGain.gain.cancelScheduledValues(t);
-          tensionNodes.droneGain.gain.setValueAtTime(
-            tensionNodes.droneGain.gain.value, t
-          );
+          tensionNodes.droneGain.gain.setValueAtTime(tensionNodes.droneGain.gain.value, t);
           tensionNodes.droneGain.gain.linearRampToValueAtTime(0, t + 0.15);
         }
         if (tensionNodes.subGain) {
           tensionNodes.subGain.gain.cancelScheduledValues(t);
-          tensionNodes.subGain.gain.setValueAtTime(
-            tensionNodes.subGain.gain.value, t
-          );
+          tensionNodes.subGain.gain.setValueAtTime(tensionNodes.subGain.gain.value, t);
           tensionNodes.subGain.gain.linearRampToValueAtTime(0, t + 0.15);
         }
         if (tensionNodes.shepardMaster) {
           tensionNodes.shepardMaster.gain.cancelScheduledValues(t);
-          tensionNodes.shepardMaster.gain.setValueAtTime(
-            tensionNodes.shepardMaster.gain.value, t
-          );
+          tensionNodes.shepardMaster.gain.setValueAtTime(tensionNodes.shepardMaster.gain.value, t);
           tensionNodes.shepardMaster.gain.linearRampToValueAtTime(0, t + 0.15);
+        }
+        if (tensionNodes.ambientGain) {
+          tensionNodes.ambientGain.gain.cancelScheduledValues(t);
+          tensionNodes.ambientGain.gain.setValueAtTime(tensionNodes.ambientGain.gain.value, t);
+          tensionNodes.ambientGain.gain.linearRampToValueAtTime(0, t + 0.12);
+        }
+        if (tensionNodes.noiseGain) {
+          tensionNodes.noiseGain.gain.cancelScheduledValues(t);
+          tensionNodes.noiseGain.gain.setValueAtTime(tensionNodes.noiseGain.gain.value, t);
+          tensionNodes.noiseGain.gain.linearRampToValueAtTime(0, t + 0.12);
         }
         if (tensionNodes.shepardGains) {
           tensionNodes.shepardGains.forEach(function (g) {
@@ -4085,12 +4121,23 @@
               try { osc.stop(); } catch (e) {}
             });
           }
+          if (tensionNodes.ambientOscs) {
+            tensionNodes.ambientOscs.forEach(function (osc) {
+              try { osc.stop(); } catch (e) {}
+            });
+          }
+          if (tensionNodes.noiseBed) {
+            try { tensionNodes.noiseBed.stop(); } catch (e) {}
+          }
+          if (tensionNodes.warpLfo) {
+            try { tensionNodes.warpLfo.stop(); } catch (e) {}
+          }
         } catch (e) {}
         tensionNodes = null;
       }, 180);
     }
 
-    function startTensionAudio(totalDelayMs) {
+    function startTensionAudio(totalDelayMs, roundIndex) {
       stopTensionAudio();
       if (!audioCtx) return;
       if (audioCtx.state === 'suspended') return;
@@ -4099,89 +4146,186 @@
       var ctx = audioCtx;
       var t = ctx.currentTime;
       var dur = totalDelayMs / 1000;
-      var silenceCutoff = dur - TENSION_SILENCE_SEC;
+      var profile = getTensionProfile(roundIndex || 0);
+      var silenceCutoff = dur - profile.silenceSec;
       var riseEnd = dur * 0.85;
+      var intensity = profile.intensity;
 
-      // ── CAPA 1: Drone subsónico (55Hz → 72Hz) ──
+      var tensionMaster = ctx.createGain();
+      tensionMaster.gain.setValueAtTime(0.92 + intensity * 0.08, t);
+      tensionMaster.connect(ctx.destination);
+
+      // ── CAPA 1: Drone subsónico — más grave y fuerte en rondas altas ──
       var drone = ctx.createOscillator();
       var droneGain = ctx.createGain();
       var droneFilter = ctx.createBiquadFilter();
+      var droneDelay = ctx.createDelay(0.15);
+      var droneDelayGain = ctx.createGain();
+      var droneMerge = ctx.createGain();
 
       drone.type = 'sine';
-      drone.frequency.setValueAtTime(55, t);
-      drone.frequency.linearRampToValueAtTime(72, t + riseEnd);
+      drone.frequency.setValueAtTime(profile.droneFreqStart, t);
+      drone.frequency.linearRampToValueAtTime(profile.droneFreqEnd, t + riseEnd);
 
       droneFilter.type = 'lowpass';
-      droneFilter.frequency.value = 200;
+      droneFilter.frequency.setValueAtTime(180 + intensity * 80, t);
+      droneFilter.frequency.linearRampToValueAtTime(260 + intensity * 140, t + riseEnd);
 
       droneGain.gain.setValueAtTime(0, t);
-      droneGain.gain.linearRampToValueAtTime(0.06, t + 0.4);
-      droneGain.gain.linearRampToValueAtTime(0.12, t + dur * 0.8);
+      droneGain.gain.linearRampToValueAtTime(profile.droneGainStart, t + 0.35);
+      droneGain.gain.linearRampToValueAtTime(profile.droneGainPeak, t + dur * 0.78);
       droneGain.gain.linearRampToValueAtTime(0, t + silenceCutoff);
+
+      droneDelay.delayTime.value = 0.07 + intensity * 0.04;
+      droneDelayGain.gain.value = 0.22 + intensity * 0.18;
 
       drone.connect(droneFilter);
       droneFilter.connect(droneGain);
-      droneGain.connect(ctx.destination);
+      droneGain.connect(droneMerge);
+      droneGain.connect(droneDelay);
+      droneDelay.connect(droneDelayGain);
+      droneDelayGain.connect(droneMerge);
+      droneMerge.connect(tensionMaster);
       drone.start(t);
       drone.stop(t + dur + 0.1);
 
-      // ── CAPA 2: Armónico de refuerzo (110Hz) ──
+      // ── CAPA 2: Armónico de refuerzo ──
       var sub = ctx.createOscillator();
       var subGain = ctx.createGain();
+      var subPan = ctx.createStereoPanner();
 
       sub.type = 'triangle';
-      sub.frequency.setValueAtTime(110, t);
-      sub.frequency.linearRampToValueAtTime(144, t + riseEnd);
+      sub.frequency.setValueAtTime(108 + intensity * 8, t);
+      sub.frequency.linearRampToValueAtTime(132 + intensity * 28, t + riseEnd);
 
       subGain.gain.setValueAtTime(0, t);
-      subGain.gain.linearRampToValueAtTime(0.035, t + 0.6);
-      subGain.gain.linearRampToValueAtTime(0.055, t + dur * 0.8);
+      subGain.gain.linearRampToValueAtTime(profile.subGainPeak * 0.65, t + 0.55);
+      subGain.gain.linearRampToValueAtTime(profile.subGainPeak, t + dur * 0.76);
       subGain.gain.linearRampToValueAtTime(0, t + silenceCutoff);
 
+      subPan.pan.value = 0;
       sub.connect(subGain);
-      subGain.connect(ctx.destination);
+      subGain.connect(subPan);
+      subPan.connect(tensionMaster);
       sub.start(t);
       sub.stop(t + dur + 0.1);
 
-      // ── CAPA 4: Shepard tone — nota que sube sin resolver ──
+      // ── CAPA 5: Ambiente estéreo envolvente (batimiento L/R) ──
+      var ambientOscs = [];
+      var ambientGain = ctx.createGain();
+      var ambientFilter = ctx.createBiquadFilter();
+      var panSpread = profile.panSpread;
+
+      ambientFilter.type = 'lowpass';
+      ambientFilter.frequency.setValueAtTime(320 + intensity * 120, t);
+      ambientFilter.frequency.linearRampToValueAtTime(520 + intensity * 380, t + riseEnd);
+      ambientFilter.Q.value = 0.7;
+
+      ambientGain.gain.setValueAtTime(0, t);
+      ambientGain.gain.linearRampToValueAtTime(profile.ambientGainPeak * 0.6, t + 0.5);
+      ambientGain.gain.linearRampToValueAtTime(profile.ambientGainPeak, t + dur * 0.7);
+      ambientGain.gain.linearRampToValueAtTime(0, t + silenceCutoff);
+
+      [
+        { freq: 82, pan: -panSpread },
+        { freq: 83.4 + intensity * 1.2, pan: panSpread }
+      ].forEach(function (cfg) {
+        var amb = ctx.createOscillator();
+        var ambPan = ctx.createStereoPanner();
+        amb.type = 'sine';
+        amb.frequency.setValueAtTime(cfg.freq, t);
+        amb.frequency.linearRampToValueAtTime(cfg.freq + 6 + intensity * 14, t + riseEnd);
+        ambPan.pan.value = cfg.pan;
+        amb.connect(ambPan);
+        ambPan.connect(ambientFilter);
+        amb.start(t);
+        amb.stop(t + dur + 0.1);
+        ambientOscs.push(amb);
+      });
+
+      ambientFilter.connect(ambientGain);
+      ambientGain.connect(tensionMaster);
+
+      // ── CAPA 6: Lecho de ruido que crece — sensación de presión en la sala ──
+      var noiseLen = Math.max(1, Math.ceil(ctx.sampleRate * dur));
+      var noiseBuffer = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
+      var noiseData = noiseBuffer.getChannelData(0);
+      for (var n = 0; n < noiseLen; n++) {
+        noiseData[n] = (Math.random() * 2 - 1) * 0.55;
+      }
+      var noiseBed = ctx.createBufferSource();
+      noiseBed.buffer = noiseBuffer;
+      noiseBed.loop = false;
+      var noiseFilter = ctx.createBiquadFilter();
+      var noiseGain = ctx.createGain();
+      var warpLfo = ctx.createOscillator();
+      var warpLfoGain = ctx.createGain();
+
+      noiseFilter.type = 'lowpass';
+      noiseFilter.frequency.setValueAtTime(180 + intensity * 60, t);
+      noiseFilter.frequency.linearRampToValueAtTime(420 + intensity * 520, t + riseEnd);
+      noiseGain.gain.setValueAtTime(0, t);
+      noiseGain.gain.linearRampToValueAtTime(profile.noiseBedPeak * 0.5, t + 0.45);
+      noiseGain.gain.linearRampToValueAtTime(profile.noiseBedPeak, t + dur * 0.72);
+      noiseGain.gain.linearRampToValueAtTime(0, t + silenceCutoff);
+
+      warpLfo.type = 'sine';
+      warpLfo.frequency.value = 0.12 + intensity * 0.22;
+      warpLfoGain.gain.value = 40 + intensity * 90;
+      warpLfo.connect(warpLfoGain);
+      warpLfoGain.connect(noiseFilter.frequency);
+      warpLfo.start(t);
+      warpLfo.stop(t + dur + 0.1);
+
+      noiseBed.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(tensionMaster);
+      noiseBed.start(t);
+      noiseBed.stop(t + dur + 0.1);
+
+      // ── CAPA 4: Shepard tone — más denso en rondas altas ──
       var shepardOscs = [];
       var shepardGains = [];
       var shepardMaster = ctx.createGain();
       var shepardFilter = ctx.createBiquadFilter();
-      var numShepardVoices = 4;
+      var numShepardVoices = 4 + Math.round(intensity * 2);
       var curveSteps = Math.max(64, Math.floor(dur * 50));
 
       shepardFilter.type = 'lowpass';
-      shepardFilter.frequency.setValueAtTime(900, t);
-      shepardFilter.frequency.linearRampToValueAtTime(1400, t + riseEnd);
-      shepardFilter.Q.value = 0.6;
+      shepardFilter.frequency.setValueAtTime(800 + intensity * 200, t);
+      shepardFilter.frequency.linearRampToValueAtTime(profile.shepardFilterEnd, t + riseEnd);
+      shepardFilter.Q.value = 0.55 + intensity * 0.25;
 
       shepardMaster.gain.setValueAtTime(0, t);
-      shepardMaster.gain.linearRampToValueAtTime(0.028, t + 0.55);
-      shepardMaster.gain.linearRampToValueAtTime(0.042, t + dur * 0.72);
+      shepardMaster.gain.linearRampToValueAtTime(profile.shepardGainMid, t + 0.5);
+      shepardMaster.gain.linearRampToValueAtTime(profile.shepardGainPeak, t + dur * 0.7);
       shepardMaster.gain.linearRampToValueAtTime(0, t + silenceCutoff);
 
       for (var v = 0; v < numShepardVoices; v++) {
         var shepardOsc = ctx.createOscillator();
         var shepardGain = ctx.createGain();
-        var startFreq = 110 * Math.pow(2, v);
+        var shepardPan = ctx.createStereoPanner();
+        var startFreq = (100 + intensity * 18) * Math.pow(2, v);
 
         shepardOsc.type = 'sine';
         shepardOsc.frequency.setValueAtTime(startFreq, t);
-        shepardOsc.frequency.exponentialRampToValueAtTime(startFreq * 2, t + riseEnd);
+        shepardOsc.frequency.exponentialRampToValueAtTime(startFreq * (1.85 + intensity * 0.25), t + riseEnd);
 
         var gainCurve = new Float32Array(curveSteps);
+        var shepardAmp = 0.26 + intensity * 0.12;
         for (var s = 0; s < curveSteps; s++) {
-          var phase = ((s / curveSteps) * 1.75 + v / numShepardVoices) % 1;
-          gainCurve[s] = Math.pow(Math.sin(phase * Math.PI), 1.35) * 0.3;
+          var phase = ((s / curveSteps) * (1.6 + intensity * 0.35) + v / numShepardVoices) % 1;
+          gainCurve[s] = Math.pow(Math.sin(phase * Math.PI), 1.25 + intensity * 0.2) * shepardAmp;
         }
 
         shepardGain.gain.setValueAtTime(0.001, t);
         shepardGain.gain.setValueCurveAtTime(gainCurve, t, riseEnd);
         shepardGain.gain.linearRampToValueAtTime(0, t + silenceCutoff);
 
+        shepardPan.pan.value = (v / Math.max(1, numShepardVoices - 1) - 0.5) * panSpread * 1.4;
         shepardOsc.connect(shepardGain);
-        shepardGain.connect(shepardMaster);
+        shepardGain.connect(shepardPan);
+        shepardPan.connect(shepardMaster);
         shepardOsc.start(t);
         shepardOsc.stop(t + dur + 0.1);
         shepardOscs.push(shepardOsc);
@@ -4189,21 +4333,27 @@
       }
 
       shepardMaster.connect(shepardFilter);
-      shepardFilter.connect(ctx.destination);
+      shepardFilter.connect(tensionMaster);
 
       tensionNodes = {
+        master: tensionMaster,
         drone: drone,
         droneGain: droneGain,
         sub: sub,
         subGain: subGain,
         shepardOscs: shepardOscs,
         shepardGains: shepardGains,
-        shepardMaster: shepardMaster
+        shepardMaster: shepardMaster,
+        ambientOscs: ambientOscs,
+        ambientGain: ambientGain,
+        noiseBed: noiseBed,
+        noiseGain: noiseGain,
+        warpLfo: warpLfo
       };
 
-      // ── CAPA 3: Pulso que acelera (entrainment cardíaco 60 → 140 BPM) ──
-      var bpm = 60;
-      var bpmTarget = 140;
+      // ── CAPA 3: Pulso cardíaco — BPM y volumen escalan con la ronda ──
+      var bpm = profile.bpmStart;
+      var bpmTarget = profile.bpmTarget;
       var elapsed = 0;
       var silenceZone = silenceCutoff;
 
@@ -4212,8 +4362,9 @@
         if (elapsed >= silenceZone) return;
 
         var progress = Math.min(elapsed / riseEnd, 1);
-        var currentBpm = bpm + Math.pow(progress, 2.2) * (bpmTarget - bpm);
+        var currentBpm = bpm + Math.pow(progress, profile.pulseExponent) * (bpmTarget - bpm);
         var intervalMs = (60 / currentBpm) * 1000;
+        var localIntensity = intensity + progress * 0.35;
 
         initAudio().then(function (pulseCtx) {
           if (!tensionActive) return;
@@ -4221,23 +4372,27 @@
             var tickOsc = pulseCtx.createOscillator();
             var tickGain = pulseCtx.createGain();
             var tickFilter = pulseCtx.createBiquadFilter();
+            var tickPan = pulseCtx.createStereoPanner();
 
             tickOsc.type = 'sine';
-            tickOsc.frequency.value = 180 + progress * 220;
+            tickOsc.frequency.value =
+              profile.tickFreqBase + progress * profile.tickFreqRange + localIntensity * 40;
 
             tickFilter.type = 'bandpass';
-            tickFilter.frequency.value = 300;
-            tickFilter.Q.value = 2;
+            tickFilter.frequency.value = 260 + localIntensity * 120 + progress * 180;
+            tickFilter.Q.value = 1.6 + localIntensity * 0.8;
 
-            var vol = 0.018 + progress * 0.028;
+            var vol = profile.pulseVolBase + progress * profile.pulseVolRange;
+            tickPan.pan.value = (Math.random() - 0.5) * panSpread * 0.6;
             tickGain.gain.setValueAtTime(vol, pulseCtx.currentTime);
-            tickGain.gain.exponentialRampToValueAtTime(0.001, pulseCtx.currentTime + 0.06);
+            tickGain.gain.exponentialRampToValueAtTime(0.001, pulseCtx.currentTime + 0.065);
 
             tickOsc.connect(tickFilter);
             tickFilter.connect(tickGain);
-            tickGain.connect(pulseCtx.destination);
+            tickGain.connect(tickPan);
+            tickPan.connect(pulseCtx.destination);
             tickOsc.start(pulseCtx.currentTime);
-            tickOsc.stop(pulseCtx.currentTime + 0.07);
+            tickOsc.stop(pulseCtx.currentTime + 0.075);
           } catch (e) {}
         });
 
@@ -4245,7 +4400,7 @@
         tensionPulseTimer = setTimeout(schedulePulse, intervalMs);
       }
 
-      tensionPulseTimer = setTimeout(schedulePulse, 600);
+      tensionPulseTimer = setTimeout(schedulePulse, 520 - intensity * 120);
     }
 
     /* ── End tension audio system ── */
@@ -4486,7 +4641,7 @@
 
       // Inicia la atmósfera de tensión sincronizada con el delay exacto
       initAudio().then(function() {
-        startTensionAudio(delay);
+        startTensionAudio(delay, gameState.round);
       }).catch(function() {});
 
       roundDelayTimer = setTimeout(activateSignal, delay);
