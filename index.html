@@ -2235,6 +2235,37 @@
     #tourney-players strong {
       color: var(--color-secondary);
     }
+
+    .admin-pool-panel {
+      width: 100%;
+      margin-top: 0.65rem;
+      padding: 0.65rem 0.75rem;
+      border-radius: var(--radius-md);
+      border: 1px dashed rgba(255, 170, 0, 0.45);
+      background: rgba(255, 170, 0, 0.06);
+      text-align: center;
+    }
+
+    .admin-pool-label {
+      display: block;
+      font-size: 0.65rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-warning);
+      margin-bottom: 0.5rem;
+    }
+
+    .admin-pool-actions {
+      display: flex;
+      gap: 0.45rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .admin-pool-actions .btn {
+      font-size: 0.68rem;
+      padding: 0.4rem 0.65rem;
+    }
   </style>
 </head>
 <body>
@@ -2530,6 +2561,13 @@
           UNIRSE AL TORNEO
         </button>
         <span class="entry-fee-hint" id="entry-fee-hint">Entrada <strong>$0.25</strong> · paga con cUSD o USDT</span>
+        <div class="admin-pool-panel" id="admin-pool-panel" hidden>
+          <span class="admin-pool-label">Admin · patrocinar pool (testnet)</span>
+          <div class="admin-pool-actions">
+            <button type="button" class="btn btn-secondary" id="btn-sponsor-usdt-1">+ $1 USDT</button>
+            <button type="button" class="btn btn-secondary" id="btn-sponsor-cusd-1">+ $1 cUSD</button>
+          </div>
+        </div>
         <span class="badge badge-antitramp">Anti-Trampa Verificado</span>
       </div>
 
@@ -5141,11 +5179,45 @@
       var bar = document.getElementById('wallet-bar');
       var addrEl = document.getElementById('wallet-addr');
       var demoBadge = document.getElementById('wallet-demo-badge');
+      var adminPanel = document.getElementById('admin-pool-panel');
       var state = TapBeatChain.getState();
       if (state.wallet && bar && addrEl) {
         bar.hidden = false;
         addrEl.textContent = TapBeatChain.getWalletShort();
         if (demoBadge) demoBadge.hidden = !state.demoMode;
+      }
+      if (adminPanel && state.wallet) {
+        TapBeatChain.isContractOwner().then(function (isOwner) {
+          adminPanel.hidden = !isOwner;
+        });
+      } else if (adminPanel) {
+        adminPanel.hidden = true;
+      }
+    }
+
+    async function runSponsorPool(usdAmount, tokenKey) {
+      var btnId = tokenKey === 'USDT' ? 'btn-sponsor-usdt-1' : 'btn-sponsor-cusd-1';
+      var btn = document.getElementById(btnId);
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Procesando…';
+      }
+      try {
+        if (!TapBeatChain.getState().wallet) {
+          await TapBeatChain.connectWallet();
+          updateWalletUI();
+        }
+        await TapBeatChain.sponsorPool(usdAmount, tokenKey);
+        await syncTournamentFromChain();
+        alert('+$' + usdAmount + ' ' + tokenKey + ' añadidos al pool del torneo actual.');
+      } catch (err) {
+        console.error('TapBeat: sponsor pool', err);
+        alert(err.message || 'No se pudo patrocinar el pool. ¿Tienes USDT/cUSD de testnet?');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '+ $' + usdAmount + ' ' + (tokenKey === 'USDT' ? 'USDT' : 'cUSD');
+        }
       }
     }
 
@@ -5550,6 +5622,8 @@
         items.push('🎮 Sé el primero en unirte — entrada gratis la 1ª vez');
       }
 
+      items.push('🎁 Admin puede patrocinar el pool con USDT/cUSD de testnet');
+
       if (entries && entries.length) {
         entries.forEach(function (row) {
           var name = row.username || shortWallet(row.wallet_address);
@@ -5676,6 +5750,19 @@
         TapBeatChain.autoConnectMiniPay().then(function () {
           updateWalletUI();
           syncTournamentFromChain();
+        });
+      }
+
+      var sponsorUsdt = document.getElementById('btn-sponsor-usdt-1');
+      var sponsorCusd = document.getElementById('btn-sponsor-cusd-1');
+      if (sponsorUsdt) {
+        sponsorUsdt.addEventListener('click', function () {
+          runSponsorPool(1, 'USDT');
+        });
+      }
+      if (sponsorCusd) {
+        sponsorCusd.addEventListener('click', function () {
+          runSponsorPool(1, 'USDm');
         });
       }
 

@@ -8,7 +8,7 @@ window.TAPBEAT_CHAIN = {
   blockExplorer: 'https://celo-sepolia.blockscout.com',
 
   // Vacío = modo demo (sin pago on-chain). Tras deploy, pega la dirección aquí.
-  contractAddress: '0x04d15bdc79e61163EcB7C61a7660a70f0f608aF8',
+  contractAddress: '0x35545A23b77CA27524e32c5939A09B127037825B',
 
   tokens: {
     USDm: {
@@ -47,6 +47,9 @@ window.TAPBEAT_CHAIN = {
     'function closeTournament(uint256 tournamentId)',
     'function refundAll(uint256 tournamentId)',
     'function finalizeTournament(uint256 tournamentId,address[3] winners)',
+    'function sponsorPool(uint256 tournamentId,uint8 token,uint256 amount)',
+    'function owner() view returns (address)',
+    'event PoolSponsored(uint256 indexed tournamentId,address indexed sponsor,uint8 token,uint256 amount,uint256 usd6Added)',
     'event PlayerEntered(uint256 indexed tournamentId,address indexed player,uint8 token,uint256 feePaid,bool wasFree)',
     'event TournamentCreated(uint256 indexed tournamentId,uint8 tier,uint256 startTime,uint256 endTime)'
   ]

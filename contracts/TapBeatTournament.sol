@@ -65,6 +65,13 @@ contract TapBeatTournament {
     event TournamentCancelled(uint256 indexed tournamentId, uint256 playerCount);
     event PlayerRefunded(uint256 indexed tournamentId, address indexed player, Token token, uint256 amount);
     event TournamentFinalized(uint256 indexed tournamentId, address[3] winners, uint256[3] prizesUsd6);
+    event PoolSponsored(
+        uint256 indexed tournamentId,
+        address indexed sponsor,
+        Token token,
+        uint256 amount,
+        uint256 usd6Added
+    );
 
     modifier onlyOwner() {
         require(msg.sender == owner, "TapBeat: not owner");
@@ -163,6 +170,24 @@ contract TapBeatTournament {
         }
 
         emit PlayerEntered(tournamentId, msg.sender, token, amount, wasFree);
+    }
+
+    /// @notice Owner puede inyectar fondos al pool (demo / patrocinio) sin entrar al torneo
+    function sponsorPool(uint256 tournamentId, Token token, uint256 amount) external onlyOwner {
+        Tournament storage t = tournaments[tournamentId];
+        require(t.startTime > 0, "TapBeat: not exists");
+        require(t.status == Status.OPEN, "TapBeat: not open");
+        require(amount > 0, "TapBeat: zero amount");
+
+        IERC20 payToken = token == Token.USDm ? usdm : usdt;
+        require(payToken.transferFrom(msg.sender, address(this), amount), "TapBeat: transfer failed");
+
+        uint256 usd6 = usd6FromAmount(token, amount);
+        if (token == Token.USDm) t.usdmPool += amount;
+        else t.usdtPool += amount;
+        t.prizePoolUsd6 += usd6;
+
+        emit PoolSponsored(tournamentId, msg.sender, token, amount, usd6);
     }
 
     function closeTournament(uint256 tournamentId) external onlyOracle {

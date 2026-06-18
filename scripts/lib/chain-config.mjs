@@ -11,6 +11,7 @@ export const TOURNAMENT_ABI = [
   'function closeTournament(uint256 tournamentId)',
   'function refundAll(uint256 tournamentId)',
   'function finalizeTournament(uint256 tournamentId,address[3] winners)',
+  'function sponsorPool(uint256 tournamentId,uint8 token,uint256 amount)',
   'function getTournament(uint256) view returns (uint8 tier,uint256 startTime,uint256 endTime,uint8 status,uint256 playerCount,uint256 usdmPool,uint256 usdtPool,uint256 prizePoolUsd6)',
   'function getPlayers(uint256 tournamentId) view returns (address[])'
 ];

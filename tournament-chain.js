@@ -284,6 +284,45 @@
     return playerCount >= (cfg.viralThreshold || 50);
   }
 
+  function usdToTokenAmount(tokenKey, usdAmount) {
+    var tokenEnum = tokenKey === 'USDT' ? Token.USDT : Token.USDm;
+    var usd6 = BigInt(Math.round(usdAmount * 1e6));
+    if (tokenEnum === Token.USDT) return { tokenEnum: tokenEnum, amountWei: usd6 };
+    return { tokenEnum: tokenEnum, amountWei: usd6 * BigInt('1000000000000') };
+  }
+
+  async function isContractOwner() {
+    if (!state.wallet || !hasContract()) return false;
+    try {
+      var reader = await getReadOnlyContract();
+      var owner = await reader.owner();
+      return owner.toLowerCase() === state.wallet.toLowerCase();
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async function sponsorPool(usdAmount, tokenKey) {
+    if (!hasContract()) throw new Error('Contrato no configurado');
+    if (!state.wallet) await connectWallet();
+
+    var isOwner = await isContractOwner();
+    if (!isOwner) throw new Error('Solo el admin (owner) puede patrocinar el pool');
+
+    if (!state.contract) {
+      state.contract = new global.ethers.Contract(cfg.contractAddress, cfg.abi, state.signer);
+    }
+
+    var parsed = usdToTokenAmount(tokenKey || state.selectedToken, usdAmount);
+    await approveTokenIfNeeded(tokenKey || state.selectedToken, parsed.amountWei);
+
+    var win = getTournamentWindow();
+    var tx = await state.contract.sponsorPool(win.id, parsed.tokenEnum, parsed.amountWei);
+    var receipt = await tx.wait();
+    await refreshTournamentState();
+    return { ok: true, txHash: receipt.hash, tournament: win, usdAmount: usdAmount };
+  }
+
   global.TapBeatChain = {
     getConfig: getConfig,
     isMiniPay: isMiniPay,
@@ -302,6 +341,8 @@
     computePoolUsd: computePoolUsd,
     usd6ToDisplay: usd6ToDisplay,
     isViral: isViral,
+    isContractOwner: isContractOwner,
+    sponsorPool: sponsorPool,
     getState: function () { return state; }
   };
 })(window);
