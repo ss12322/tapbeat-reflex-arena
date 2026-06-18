@@ -3907,17 +3907,17 @@
 
     /* ══════════════════════════════════
        SISTEMA DE TENSIÓN PSICOLÓGICA
-       3 capas: drone + pulso acelerado + silencio
+       4 capas: drone + armónico + pulso + shepard tone + silencio
        ══════════════════════════════════ */
 
     var tensionNodes = null;
     var tensionPulseTimer = null;
     var tensionActive = false;
+    var TENSION_SILENCE_SEC = 0.2; // 200ms de silencio total antes del beat
 
     function stopTensionAudio() {
       tensionActive = false;
 
-      // Limpiar timers de pulso
       if (tensionPulseTimer) {
         clearTimeout(tensionPulseTimer);
         tensionPulseTimer = null;
@@ -3927,7 +3927,6 @@
 
       var t = audioCtx ? audioCtx.currentTime : 0;
 
-      // Fade out suave del drone
       try {
         if (tensionNodes.droneGain) {
           tensionNodes.droneGain.gain.cancelScheduledValues(t);
@@ -3943,14 +3942,33 @@
           );
           tensionNodes.subGain.gain.linearRampToValueAtTime(0, t + 0.15);
         }
-      } catch(e) {}
+        if (tensionNodes.shepardMaster) {
+          tensionNodes.shepardMaster.gain.cancelScheduledValues(t);
+          tensionNodes.shepardMaster.gain.setValueAtTime(
+            tensionNodes.shepardMaster.gain.value, t
+          );
+          tensionNodes.shepardMaster.gain.linearRampToValueAtTime(0, t + 0.15);
+        }
+        if (tensionNodes.shepardGains) {
+          tensionNodes.shepardGains.forEach(function (g) {
+            g.gain.cancelScheduledValues(t);
+            g.gain.setValueAtTime(g.gain.value, t);
+            g.gain.linearRampToValueAtTime(0, t + 0.12);
+          });
+        }
+      } catch (e) {}
 
-      setTimeout(function() {
+      setTimeout(function () {
         if (!tensionNodes) return;
         try {
-          if (tensionNodes.drone)  tensionNodes.drone.stop();
-          if (tensionNodes.sub)    tensionNodes.sub.stop();
-        } catch(e) {}
+          if (tensionNodes.drone) tensionNodes.drone.stop();
+          if (tensionNodes.sub) tensionNodes.sub.stop();
+          if (tensionNodes.shepardOscs) {
+            tensionNodes.shepardOscs.forEach(function (osc) {
+              try { osc.stop(); } catch (e) {}
+            });
+          }
+        } catch (e) {}
         tensionNodes = null;
       }, 180);
     }
@@ -3964,28 +3982,25 @@
       var ctx = audioCtx;
       var t = ctx.currentTime;
       var dur = totalDelayMs / 1000;
+      var silenceCutoff = dur - TENSION_SILENCE_SEC;
+      var riseEnd = dur * 0.85;
 
-      // ── CAPA 1: Drone subsónico (55Hz) ──
-      // Frecuencia baja que el cuerpo siente físicamente
-      // Activa el sistema nervioso antes de que el cerebro lo procese
+      // ── CAPA 1: Drone subsónico (55Hz → 72Hz) ──
       var drone = ctx.createOscillator();
       var droneGain = ctx.createGain();
       var droneFilter = ctx.createBiquadFilter();
 
       drone.type = 'sine';
       drone.frequency.setValueAtTime(55, t);
-      // Sube muy levemente hacia el final para crear sensación de "algo se acerca"
-      drone.frequency.linearRampToValueAtTime(72, t + dur * 0.85);
+      drone.frequency.linearRampToValueAtTime(72, t + riseEnd);
 
       droneFilter.type = 'lowpass';
       droneFilter.frequency.value = 200;
 
       droneGain.gain.setValueAtTime(0, t);
       droneGain.gain.linearRampToValueAtTime(0.06, t + 0.4);
-      // Crece suavemente durante toda la espera
       droneGain.gain.linearRampToValueAtTime(0.12, t + dur * 0.8);
-      // Silencio total 150ms antes del beat — el corte más efectivo
-      droneGain.gain.linearRampToValueAtTime(0, t + dur - 0.15);
+      droneGain.gain.linearRampToValueAtTime(0, t + silenceCutoff);
 
       drone.connect(droneFilter);
       droneFilter.connect(droneGain);
@@ -3993,88 +4008,126 @@
       drone.start(t);
       drone.stop(t + dur + 0.1);
 
-      // ── CAPA 2: Sub-drone armónico (110Hz) ──
-      // Refuerza la tensión con el segundo armónico del drone
+      // ── CAPA 2: Armónico de refuerzo (110Hz) ──
       var sub = ctx.createOscillator();
       var subGain = ctx.createGain();
 
       sub.type = 'triangle';
       sub.frequency.setValueAtTime(110, t);
-      sub.frequency.linearRampToValueAtTime(144, t + dur * 0.85);
+      sub.frequency.linearRampToValueAtTime(144, t + riseEnd);
 
       subGain.gain.setValueAtTime(0, t);
       subGain.gain.linearRampToValueAtTime(0.035, t + 0.6);
       subGain.gain.linearRampToValueAtTime(0.055, t + dur * 0.8);
-      subGain.gain.linearRampToValueAtTime(0, t + dur - 0.15);
+      subGain.gain.linearRampToValueAtTime(0, t + silenceCutoff);
 
       sub.connect(subGain);
       subGain.connect(ctx.destination);
       sub.start(t);
       sub.stop(t + dur + 0.1);
 
+      // ── CAPA 4: Shepard tone — nota que sube sin resolver ──
+      var shepardOscs = [];
+      var shepardGains = [];
+      var shepardMaster = ctx.createGain();
+      var shepardFilter = ctx.createBiquadFilter();
+      var numShepardVoices = 4;
+      var curveSteps = Math.max(64, Math.floor(dur * 50));
+
+      shepardFilter.type = 'lowpass';
+      shepardFilter.frequency.setValueAtTime(900, t);
+      shepardFilter.frequency.linearRampToValueAtTime(1400, t + riseEnd);
+      shepardFilter.Q.value = 0.6;
+
+      shepardMaster.gain.setValueAtTime(0, t);
+      shepardMaster.gain.linearRampToValueAtTime(0.028, t + 0.55);
+      shepardMaster.gain.linearRampToValueAtTime(0.042, t + dur * 0.72);
+      shepardMaster.gain.linearRampToValueAtTime(0, t + silenceCutoff);
+
+      for (var v = 0; v < numShepardVoices; v++) {
+        var shepardOsc = ctx.createOscillator();
+        var shepardGain = ctx.createGain();
+        var startFreq = 110 * Math.pow(2, v);
+
+        shepardOsc.type = 'sine';
+        shepardOsc.frequency.setValueAtTime(startFreq, t);
+        shepardOsc.frequency.exponentialRampToValueAtTime(startFreq * 2, t + riseEnd);
+
+        var gainCurve = new Float32Array(curveSteps);
+        for (var s = 0; s < curveSteps; s++) {
+          var phase = ((s / curveSteps) * 1.75 + v / numShepardVoices) % 1;
+          gainCurve[s] = Math.pow(Math.sin(phase * Math.PI), 1.35) * 0.3;
+        }
+
+        shepardGain.gain.setValueAtTime(0.001, t);
+        shepardGain.gain.setValueCurveAtTime(gainCurve, t, riseEnd);
+        shepardGain.gain.linearRampToValueAtTime(0, t + silenceCutoff);
+
+        shepardOsc.connect(shepardGain);
+        shepardGain.connect(shepardMaster);
+        shepardOsc.start(t);
+        shepardOsc.stop(t + dur + 0.1);
+        shepardOscs.push(shepardOsc);
+        shepardGains.push(shepardGain);
+      }
+
+      shepardMaster.connect(shepardFilter);
+      shepardFilter.connect(ctx.destination);
+
       tensionNodes = {
         drone: drone,
         droneGain: droneGain,
         sub: sub,
-        subGain: subGain
+        subGain: subGain,
+        shepardOscs: shepardOscs,
+        shepardGains: shepardGains,
+        shepardMaster: shepardMaster
       };
 
-      // ── CAPA 3: Pulso que acelera (entrainment cardíaco) ──
-      // Empieza lento y acelera — sincroniza involuntariamente el ritmo cardíaco
-      // El corazón sigue el ritmo externo: esto es entrainment auditivo-cardíaco
-      var bpm = 52;
-      var bpmTarget = 138;
-      var pulseCount = 0;
+      // ── CAPA 3: Pulso que acelera (entrainment cardíaco 60 → 140 BPM) ──
+      var bpm = 60;
+      var bpmTarget = 140;
       var elapsed = 0;
-      var silenceZone = dur - 0.15; // últimos 150ms = silencio total
+      var silenceZone = silenceCutoff;
 
       function schedulePulse() {
         if (!tensionActive) return;
-        if (elapsed >= silenceZone) return; // silencio antes del beat
+        if (elapsed >= silenceZone) return;
 
-        var progress = Math.min(elapsed / (dur * 0.85), 1);
-        // Curva exponencial: empieza suave, acelera dramáticamente al final
+        var progress = Math.min(elapsed / riseEnd, 1);
         var currentBpm = bpm + Math.pow(progress, 2.2) * (bpmTarget - bpm);
         var intervalMs = (60 / currentBpm) * 1000;
 
-        // Tick de pulso — muy sutil, casi imperceptible conscientemente
-        // pero el cerebro lo registra subconscientemente
-        initAudio().then(function(ctx) {
+        initAudio().then(function (pulseCtx) {
           if (!tensionActive) return;
           try {
-            var tickOsc = ctx.createOscillator();
-            var tickGain = ctx.createGain();
-            var tickFilter = ctx.createBiquadFilter();
+            var tickOsc = pulseCtx.createOscillator();
+            var tickGain = pulseCtx.createGain();
+            var tickFilter = pulseCtx.createBiquadFilter();
 
             tickOsc.type = 'sine';
-            // Frecuencia del tick sube con el BPM — pitch más alto = más urgencia
             tickOsc.frequency.value = 180 + progress * 220;
 
             tickFilter.type = 'bandpass';
             tickFilter.frequency.value = 300;
             tickFilter.Q.value = 2;
 
-            // Volumen muy bajo — psicológicamente más efectivo que uno fuerte
-            // El cerebro busca el patrón en lugar de ignorar el ruido
             var vol = 0.018 + progress * 0.028;
-            tickGain.gain.setValueAtTime(vol, ctx.currentTime);
-            tickGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
+            tickGain.gain.setValueAtTime(vol, pulseCtx.currentTime);
+            tickGain.gain.exponentialRampToValueAtTime(0.001, pulseCtx.currentTime + 0.06);
 
             tickOsc.connect(tickFilter);
             tickFilter.connect(tickGain);
-            tickGain.connect(ctx.destination);
-            tickOsc.start(ctx.currentTime);
-            tickOsc.stop(ctx.currentTime + 0.07);
-          } catch(e) {}
+            tickGain.connect(pulseCtx.destination);
+            tickOsc.start(pulseCtx.currentTime);
+            tickOsc.stop(pulseCtx.currentTime + 0.07);
+          } catch (e) {}
         });
 
         elapsed += intervalMs / 1000;
-        pulseCount++;
-
         tensionPulseTimer = setTimeout(schedulePulse, intervalMs);
       }
 
-      // Primer pulso con pequeño delay inicial
       tensionPulseTimer = setTimeout(schedulePulse, 600);
     }
 
