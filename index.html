@@ -3732,7 +3732,11 @@
       activateScreen('game-screen');
       syncNav('game-screen');
       syncHomeMusic('game-screen');
-      startGame();
+      initAudio().then(function () {
+        startGame();
+      }).catch(function () {
+        startGame();
+      });
     }
 
     function startCountdown() {
@@ -4033,6 +4037,7 @@
     var gameBedNodes = null;
     var gameBedActive = false;
     var gameBedWaitMode = false;
+    var gameBedCleanupTimer = null;
     var GAME_BED_DURATION_SEC = 720;
 
     function getTensionProfile(roundIndex) {
@@ -4078,33 +4083,40 @@
         return;
       }
 
+      var nodesToStop = gameBedNodes;
+      gameBedNodes = null;
+
       var t = audioCtx.currentTime;
       try {
-        if (gameBedNodes.master) {
-          gameBedNodes.master.gain.cancelScheduledValues(t);
-          gameBedNodes.master.gain.setValueAtTime(gameBedNodes.master.gain.value, t);
-          gameBedNodes.master.gain.linearRampToValueAtTime(0, t + 0.35);
+        if (nodesToStop.master) {
+          nodesToStop.master.gain.cancelScheduledValues(t);
+          nodesToStop.master.gain.setValueAtTime(nodesToStop.master.gain.value, t);
+          nodesToStop.master.gain.linearRampToValueAtTime(0, t + 0.35);
         }
       } catch (e) {}
 
-      setTimeout(function () {
-        if (!gameBedNodes) return;
+      if (gameBedCleanupTimer) {
+        clearTimeout(gameBedCleanupTimer);
+        gameBedCleanupTimer = null;
+      }
+
+      gameBedCleanupTimer = setTimeout(function () {
+        gameBedCleanupTimer = null;
         try {
-          if (gameBedNodes.oscs) {
-            gameBedNodes.oscs.forEach(function (osc) {
+          if (nodesToStop.oscs) {
+            nodesToStop.oscs.forEach(function (osc) {
               try { osc.stop(); } catch (e) {}
             });
           }
-          if (gameBedNodes.noiseBed) {
-            try { gameBedNodes.noiseBed.stop(); } catch (e) {}
+          if (nodesToStop.noiseBed) {
+            try { nodesToStop.noiseBed.stop(); } catch (e) {}
           }
-          if (gameBedNodes.lfos) {
-            gameBedNodes.lfos.forEach(function (lfo) {
+          if (nodesToStop.lfos) {
+            nodesToStop.lfos.forEach(function (lfo) {
               try { lfo.stop(); } catch (e) {}
             });
           }
         } catch (e) {}
-        gameBedNodes = null;
       }, 400);
     }
 
@@ -4114,22 +4126,45 @@
       var profile = getTensionProfile(roundIndex);
       var p = profile.intensity;
       var t = audioCtx.currentTime;
-      var ramp = phase === 'wait' ? 0.55 : 1.1;
-      var playMul = 0.5 + p * 0.42;
-      var waitMul = 0.95 + p * 0.75;
+      var ramp = phase === 'wait' ? 0.35 : 0.7;
+      var playMul = 0.72 + p * 0.55;
+      var waitMul = 1.05 + p * 0.85;
       var mul = phase === 'wait' ? waitMul : playMul;
 
-      gameBedNodes.master.gain.linearRampToValueAtTime(0.16 + p * 0.22 * mul, t + ramp);
-      gameBedNodes.droneGain.gain.linearRampToValueAtTime(profile.droneGainPeak * 0.42 * mul, t + ramp);
-      gameBedNodes.subGain.gain.linearRampToValueAtTime(profile.subGainPeak * 0.55 * mul, t + ramp);
-      gameBedNodes.ambientGain.gain.linearRampToValueAtTime(profile.ambientGainPeak * 1.15 * mul, t + ramp);
-      gameBedNodes.noiseGain.gain.linearRampToValueAtTime(profile.noiseBedPeak * 1.2 * mul, t + ramp);
-      gameBedNodes.shepardMaster.gain.linearRampToValueAtTime(profile.shepardGainPeak * 0.75 * mul, t + ramp);
+      gameBedNodes.master.gain.cancelScheduledValues(t);
+      gameBedNodes.master.gain.setValueAtTime(gameBedNodes.master.gain.value, t);
+      gameBedNodes.master.gain.linearRampToValueAtTime(0.38 + p * 0.32 * mul, t + ramp);
 
-      gameBedNodes.drone.frequency.linearRampToValueAtTime(profile.droneFreqStart, t + ramp);
+      gameBedNodes.droneGain.gain.cancelScheduledValues(t);
+      gameBedNodes.droneGain.gain.setValueAtTime(gameBedNodes.droneGain.gain.value, t);
+      gameBedNodes.droneGain.gain.linearRampToValueAtTime(profile.droneGainPeak * 0.75 * mul, t + ramp);
+
+      gameBedNodes.subGain.gain.cancelScheduledValues(t);
+      gameBedNodes.subGain.gain.setValueAtTime(gameBedNodes.subGain.gain.value, t);
+      gameBedNodes.subGain.gain.linearRampToValueAtTime(profile.subGainPeak * 0.9 * mul, t + ramp);
+
+      gameBedNodes.ambientGain.gain.cancelScheduledValues(t);
+      gameBedNodes.ambientGain.gain.setValueAtTime(gameBedNodes.ambientGain.gain.value, t);
+      gameBedNodes.ambientGain.gain.linearRampToValueAtTime(
+        Math.max(0.035, profile.ambientGainPeak * 2.2 * mul), t + ramp
+      );
+
+      gameBedNodes.noiseGain.gain.cancelScheduledValues(t);
+      gameBedNodes.noiseGain.gain.setValueAtTime(gameBedNodes.noiseGain.gain.value, t);
+      gameBedNodes.noiseGain.gain.linearRampToValueAtTime(
+        Math.max(0.02, profile.noiseBedPeak * 2.5 * mul), t + ramp
+      );
+
+      gameBedNodes.shepardMaster.gain.cancelScheduledValues(t);
+      gameBedNodes.shepardMaster.gain.setValueAtTime(gameBedNodes.shepardMaster.gain.value, t);
+      gameBedNodes.shepardMaster.gain.linearRampToValueAtTime(profile.shepardGainPeak * 1.4 * mul, t + ramp);
+
+      gameBedNodes.drone.frequency.cancelScheduledValues(t);
+      gameBedNodes.drone.frequency.setValueAtTime(gameBedNodes.drone.frequency.value, t);
+      gameBedNodes.drone.frequency.linearRampToValueAtTime(profile.droneFreqStart, t + 0.05);
       gameBedNodes.drone.frequency.linearRampToValueAtTime(
         profile.droneFreqEnd * (phase === 'wait' ? 1.05 : 0.92),
-        t + ramp + 1.8
+        t + ramp + 1.5
       );
     }
 
@@ -4142,12 +4177,19 @@
 
       gameBedNodes.master.gain.cancelScheduledValues(t);
       gameBedNodes.master.gain.setValueAtTime(gameBedNodes.master.gain.value, t);
-      gameBedNodes.master.gain.linearRampToValueAtTime(0.025, t + 0.1);
-      gameBedNodes.master.gain.linearRampToValueAtTime(0.14 + p * 0.18, t + 0.32);
+      gameBedNodes.master.gain.linearRampToValueAtTime(0.06, t + 0.12);
+      gameBedNodes.master.gain.linearRampToValueAtTime(0.34 + p * 0.28, t + 0.35);
     }
 
     function startGameBed() {
-      stopGameBed();
+      if (gameBedActive && gameBedNodes) {
+        return Promise.resolve();
+      }
+
+      if (gameBedCleanupTimer) {
+        clearTimeout(gameBedCleanupTimer);
+        gameBedCleanupTimer = null;
+      }
 
       return initAudio().then(function (ctx) {
         if (ctx.state === 'suspended') {
@@ -4155,64 +4197,54 @@
         }
         return ctx;
       }).then(function (ctx) {
-        gameBedActive = true;
+        if (ctx.state === 'suspended') {
+          return ctx.resume().then(function () { return ctx; });
+        }
+        return ctx;
+      }).then(function (ctx) {
         var t = ctx.currentTime;
         var end = t + GAME_BED_DURATION_SEC;
         var oscs = [];
-        var lfos = [];
 
         var master = ctx.createGain();
-        master.gain.setValueAtTime(0, t);
-        master.gain.linearRampToValueAtTime(0.12, t + 1.4);
+        master.gain.setValueAtTime(0.001, t);
+        master.gain.linearRampToValueAtTime(0.42, t + 0.45);
         master.connect(ctx.destination);
 
-        // Drone subsónico continuo
         var drone = ctx.createOscillator();
         var droneGain = ctx.createGain();
         var droneFilter = ctx.createBiquadFilter();
-        var droneLfo = ctx.createOscillator();
-        var droneLfoGain = ctx.createGain();
         drone.type = 'sine';
-        drone.frequency.setValueAtTime(50, t);
+        drone.frequency.setValueAtTime(55, t);
         droneFilter.type = 'lowpass';
-        droneFilter.frequency.value = 220;
-        droneLfo.type = 'sine';
-        droneLfo.frequency.value = 0.09;
-        droneLfoGain.gain.value = 0.018;
-        droneGain.gain.value = 0.04;
-        droneLfo.connect(droneLfoGain);
-        droneLfoGain.connect(droneGain.gain);
+        droneFilter.frequency.value = 320;
+        droneGain.gain.value = 0.1;
         drone.connect(droneFilter);
         droneFilter.connect(droneGain);
         droneGain.connect(master);
         drone.start(t);
         drone.stop(end);
-        droneLfo.start(t);
-        droneLfo.stop(end);
         oscs.push(drone);
-        lfos.push(droneLfo);
 
-        // Armónico de refuerzo
         var sub = ctx.createOscillator();
         var subGain = ctx.createGain();
         sub.type = 'triangle';
-        sub.frequency.value = 100;
-        subGain.gain.value = 0.022;
+        sub.frequency.value = 110;
+        subGain.gain.value = 0.055;
         sub.connect(subGain);
         subGain.connect(master);
         sub.start(t);
         sub.stop(end);
         oscs.push(sub);
 
-        // Ambiente estéreo envolvente
         var ambientGain = ctx.createGain();
         var ambientFilter = ctx.createBiquadFilter();
         ambientFilter.type = 'lowpass';
-        ambientFilter.frequency.value = 420;
-        ambientGain.gain.value = 0.01;
+        ambientFilter.frequency.value = 520;
+        ambientGain.gain.value = 0.028;
         [
-          { freq: 80, pan: -0.55 },
-          { freq: 81.6, pan: 0.55 }
+          { freq: 82, pan: -0.6 },
+          { freq: 83.8, pan: 0.6 }
         ].forEach(function (cfg) {
           var amb = ctx.createOscillator();
           var ambPan = ctx.createStereoPanner();
@@ -4228,53 +4260,41 @@
         ambientFilter.connect(ambientGain);
         ambientGain.connect(master);
 
-        // Ruido de sala en loop
         var noiseLen = ctx.sampleRate * 2;
         var noiseBuffer = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
         var noiseData = noiseBuffer.getChannelData(0);
         for (var i = 0; i < noiseLen; i++) {
-          noiseData[i] = (Math.random() * 2 - 1) * 0.5;
+          noiseData[i] = (Math.random() * 2 - 1) * 0.55;
         }
         var noiseBed = ctx.createBufferSource();
         noiseBed.buffer = noiseBuffer;
         noiseBed.loop = true;
         var noiseFilter = ctx.createBiquadFilter();
         var noiseGain = ctx.createGain();
-        var noiseLfo = ctx.createOscillator();
-        var noiseLfoGain = ctx.createGain();
         noiseFilter.type = 'lowpass';
-        noiseFilter.frequency.value = 280;
-        noiseGain.gain.value = 0.006;
-        noiseLfo.type = 'sine';
-        noiseLfo.frequency.value = 0.16;
-        noiseLfoGain.gain.value = 90;
-        noiseLfo.connect(noiseLfoGain);
-        noiseLfoGain.connect(noiseFilter.frequency);
+        noiseFilter.frequency.value = 380;
+        noiseGain.gain.value = 0.022;
         noiseBed.connect(noiseFilter);
         noiseFilter.connect(noiseGain);
         noiseGain.connect(master);
         noiseBed.start(t);
         noiseBed.stop(end);
-        noiseLfo.start(t);
-        noiseLfo.stop(end);
-        lfos.push(noiseLfo);
 
-        // Shepard continuo — tensión musical que nunca resuelve
         var shepardMaster = ctx.createGain();
         var shepardFilter = ctx.createBiquadFilter();
         shepardFilter.type = 'lowpass';
-        shepardFilter.frequency.value = 1100;
-        shepardMaster.gain.value = 0.014;
+        shepardFilter.frequency.value = 1400;
+        shepardMaster.gain.value = 0.032;
         for (var v = 0; v < 4; v++) {
           var shepardOsc = ctx.createOscillator();
           var shepardGain = ctx.createGain();
           var shepardPan = ctx.createStereoPanner();
-          var startFreq = 108 * Math.pow(2, v);
+          var startFreq = 110 * Math.pow(2, v);
           shepardOsc.type = 'sine';
           shepardOsc.frequency.setValueAtTime(startFreq, t);
-          shepardOsc.frequency.exponentialRampToValueAtTime(startFreq * 1.85, t + 14);
-          shepardGain.gain.value = 0.08 + (v % 2) * 0.04;
-          shepardPan.pan.value = (v - 1.5) * 0.35;
+          shepardOsc.frequency.exponentialRampToValueAtTime(startFreq * 1.7, t + 12);
+          shepardGain.gain.value = 0.1 + (v % 2) * 0.05;
+          shepardPan.pan.value = (v - 1.5) * 0.4;
           shepardOsc.connect(shepardGain);
           shepardGain.connect(shepardPan);
           shepardPan.connect(shepardMaster);
@@ -4295,12 +4315,11 @@
           noiseGain: noiseGain,
           noiseBed: noiseBed,
           shepardMaster: shepardMaster,
-          oscs: oscs,
-          lfos: lfos
+          oscs: oscs
         };
-
+        gameBedActive = true;
         setGameBedIntensity(0, 'play');
-      }).catch(function () { /* audio no disponible */ });
+      });
     }
 
     function stopTensionAudio() {
@@ -4318,53 +4337,48 @@
     }
 
     function startTensionAudio(totalDelayMs, roundIndex) {
-      if (!gameBedActive) {
-        startGameBed().then(function () {
-          startTensionAudio(totalDelayMs, roundIndex);
-        });
-        return;
-      }
-      if (!audioCtx || audioCtx.state === 'suspended') return;
+      var beginWait = function () {
+        if (!audioCtx) return;
 
-      stopTensionAudio();
-      tensionActive = true;
-      gameBedWaitMode = true;
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume().then(function () {
+            beginWait();
+          }).catch(function () {});
+          return;
+        }
 
-      var profile = getTensionProfile(roundIndex || 0);
-      var dur = totalDelayMs / 1000;
-      var silenceCutoff = dur - profile.silenceSec;
-      var riseEnd = dur * 0.85;
-      var intensity = profile.intensity;
-      var panSpread = profile.panSpread;
-      var bpm = profile.bpmStart;
-      var bpmTarget = profile.bpmTarget;
-      var elapsed = 0;
+        stopTensionAudio();
+        tensionActive = true;
+        gameBedWaitMode = true;
 
-      setGameBedIntensity(roundIndex || 0, 'wait');
+        var profile = getTensionProfile(roundIndex || 0);
+        var dur = totalDelayMs / 1000;
+        var silenceCutoff = dur - profile.silenceSec;
+        var riseEnd = dur * 0.85;
+        var intensity = profile.intensity;
+        var panSpread = profile.panSpread;
+        var bpm = profile.bpmStart;
+        var bpmTarget = profile.bpmTarget;
+        var elapsed = 0;
 
-      if (gameBedNodes && audioCtx) {
-        var t = audioCtx.currentTime;
-        gameBedNodes.master.gain.linearRampToValueAtTime(0.001, t + silenceCutoff);
-      }
+        setGameBedIntensity(roundIndex || 0, 'wait');
 
-      function schedulePulse() {
-        if (!tensionActive || !gameBedWaitMode) return;
-        if (elapsed >= silenceCutoff) return;
-
-        var progress = Math.min(elapsed / riseEnd, 1);
-        var currentBpm = bpm + Math.pow(progress, profile.pulseExponent) * (bpmTarget - bpm);
-        var intervalMs = (60 / currentBpm) * 1000;
-
-        initAudio().then(function (pulseCtx) {
+        function schedulePulse() {
           if (!tensionActive || !gameBedWaitMode) return;
+          if (elapsed >= silenceCutoff) return;
+
+          var progress = Math.min(elapsed / riseEnd, 1);
+          var currentBpm = bpm + Math.pow(progress, profile.pulseExponent) * (bpmTarget - bpm);
+          var intervalMs = (60 / currentBpm) * 1000;
+
           try {
-            var tickOsc = pulseCtx.createOscillator();
-            var tickGain = pulseCtx.createGain();
-            var tickFilter = pulseCtx.createBiquadFilter();
-            var tickPan = pulseCtx.createStereoPanner();
+            var tickOsc = audioCtx.createOscillator();
+            var tickGain = audioCtx.createGain();
+            var tickFilter = audioCtx.createBiquadFilter();
+            var tickPan = audioCtx.createStereoPanner();
             var bedDest = gameBedNodes && gameBedNodes.master
               ? gameBedNodes.master
-              : pulseCtx.destination;
+              : audioCtx.destination;
 
             tickOsc.type = 'sine';
             tickOsc.frequency.value =
@@ -4374,25 +4388,32 @@
             tickFilter.frequency.value = 260 + intensity * 120 + progress * 180;
             tickFilter.Q.value = 1.6 + intensity * 0.8;
 
-            var vol = profile.pulseVolBase + progress * profile.pulseVolRange;
+            var vol = (profile.pulseVolBase + progress * profile.pulseVolRange) * 1.8;
             tickPan.pan.value = (Math.random() - 0.5) * panSpread * 0.6;
-            tickGain.gain.setValueAtTime(vol, pulseCtx.currentTime);
-            tickGain.gain.exponentialRampToValueAtTime(0.001, pulseCtx.currentTime + 0.065);
+            var now = audioCtx.currentTime;
+            tickGain.gain.setValueAtTime(vol, now);
+            tickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.065);
 
             tickOsc.connect(tickFilter);
             tickFilter.connect(tickGain);
             tickGain.connect(tickPan);
             tickPan.connect(bedDest);
-            tickOsc.start(pulseCtx.currentTime);
-            tickOsc.stop(pulseCtx.currentTime + 0.075);
+            tickOsc.start(now);
+            tickOsc.stop(now + 0.075);
           } catch (e) {}
-        });
 
-        elapsed += intervalMs / 1000;
-        tensionPulseTimer = setTimeout(schedulePulse, intervalMs);
+          elapsed += intervalMs / 1000;
+          tensionPulseTimer = setTimeout(schedulePulse, intervalMs);
+        }
+
+        tensionPulseTimer = setTimeout(schedulePulse, 480 - intensity * 100);
+      };
+
+      if (!gameBedActive) {
+        startGameBed().then(beginWait);
+        return;
       }
-
-      tensionPulseTimer = setTimeout(schedulePulse, 520 - intensity * 120);
+      beginWait();
     }
 
     /* ── End tension audio system ── */
