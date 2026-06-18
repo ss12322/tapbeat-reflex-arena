@@ -82,14 +82,62 @@ El pool crece automáticamente mientras la página está abierta.
 
 ---
 
+## Torneo horario on-chain (cUSD + USDT)
+
+TapBeat soporta torneos **cada hora** con pagos en **cUSD (USDm)** o **USDT** vía MiniPay en Celo Sepolia.
+
+| Regla | Valor |
+|-------|-------|
+| Entrada básica | **$0.25** |
+| Primera jugada | **Gratis** por wallet (`hasPlayedFree`) |
+| Mínimo para correr | **10 jugadores** |
+| Si &lt; 10 | Reembolso automático on-chain |
+| Viral | Badge especial con **50+** jugadores |
+| Tu comisión | **20%** del pool |
+| Premios | 40% / 24% / 16% del neto |
+
+### Archivos blockchain
+
+```
+contract-config.js    # Dirección del contrato + tokens Sepolia
+tournament-chain.js   # MiniPay, approve, enterTournament
+contracts/
+  TapBeatTournament.sol
+  README.md           # Instrucciones de deploy
+```
+
+### Configurar contrato
+
+1. Despliega `TapBeatTournament.sol` en Celo Sepolia (ver `contracts/README.md`).
+2. Pega la dirección en `contract-config.js`:
+
+```javascript
+contractAddress: '0xTuContratoDesplegado',
+```
+
+3. Ejecuta el SQL nuevo en `supabase/schema.sql` (tablas `tournaments`, `tournament_entries`).
+
+Sin `contractAddress`, el juego corre en **modo demo** (sin cobro real, primera gratis en localStorage).
+
+### MiniPay
+
+Abre la app dentro de MiniPay en Celo Sepolia. El botón **UNIRSE** conecta la wallet, aprueba el token y llama `enterTournament`.
+
+---
+
 ## Estructura del proyecto
 
 ```
 .
 ├── index.html          # Juego completo (HTML, CSS y JavaScript)
+├── contract-config.js  # Celo Sepolia + dirección del contrato
+├── tournament-chain.js # MiniPay / pagos cUSD y USDT
+├── contracts/
+│   ├── TapBeatTournament.sol
+│   └── README.md
 ├── supabase-config.js  # URL y anon key de Supabase
 ├── supabase/
-│   └── schema.sql      # Tablas profiles y scores (ejecutar en Supabase)
+│   └── schema.sql      # Tablas profiles, scores y torneos
 ├── sounds/
 │   └── tron-juego.wav  # Música de la pantalla Home
 └── README.md

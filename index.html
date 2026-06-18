@@ -2154,6 +2154,87 @@
       letter-spacing: 0.05em;
       z-index: 2;
     }
+
+    .wallet-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+      padding: 0.65rem 0.75rem;
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(0, 212, 255, 0.25);
+      background: rgba(0, 212, 255, 0.05);
+      font-size: 0.68rem;
+    }
+
+    .wallet-bar .wallet-addr {
+      color: var(--color-secondary);
+      letter-spacing: 0.04em;
+    }
+
+    .wallet-bar .wallet-demo {
+      color: var(--color-warning);
+    }
+
+    .token-select {
+      display: flex;
+      gap: 0.4rem;
+      margin-bottom: 0.65rem;
+    }
+
+    .token-select button {
+      flex: 1;
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      padding: 0.45rem 0.5rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(0, 255, 136, 0.25);
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--color-text-muted);
+      cursor: pointer;
+    }
+
+    .token-select button.active {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+      background: rgba(0, 255, 136, 0.08);
+    }
+
+    .entry-fee-hint {
+      display: block;
+      text-align: center;
+      font-size: 0.68rem;
+      color: var(--color-text-muted);
+      margin-top: 0.45rem;
+    }
+
+    .entry-fee-hint strong {
+      color: var(--color-primary);
+    }
+
+    .badge-viral {
+      background: linear-gradient(90deg, #ffaa00, #ff00aa);
+      color: #0a0a0f;
+      font-weight: 700;
+      animation: viral-pulse 1.2s ease infinite;
+    }
+
+    @keyframes viral-pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(1.03); }
+    }
+
+    #tourney-players {
+      font-size: 0.72rem;
+      color: var(--color-text-muted);
+      text-align: center;
+      margin-top: 0.35rem;
+    }
+
+    #tourney-players strong {
+      color: var(--color-secondary);
+    }
   </style>
 </head>
 <body>
@@ -2409,7 +2490,10 @@
         </div>
         <div class="prize-pool-total">
           <div class="prize-pool-total-label">Pool Total</div>
-          <div class="prize-pool-total-value" id="pool-total">4.75</div>
+          <div class="prize-pool-total-value" id="pool-total">0.00</div>
+        </div>
+        <div id="tourney-viral-badge" hidden>
+          <span class="badge badge-viral">🔥 TORNEO VIRAL — 50+ jugadores</span>
         </div>
         <div class="prize-pool-breakdown">
           <div class="prize-pool-item">
@@ -2433,9 +2517,19 @@
 
       <!-- 2. CTA PRINCIPAL — call to action inmediato -->
       <div class="home-actions">
+        <div class="wallet-bar" id="wallet-bar" hidden>
+          <span>Wallet:</span>
+          <span class="wallet-addr" id="wallet-addr">—</span>
+          <span class="wallet-demo" id="wallet-demo-badge" hidden>Modo demo</span>
+        </div>
+        <div class="token-select" id="token-select">
+          <button type="button" class="active" data-token="USDm">cUSD</button>
+          <button type="button" data-token="USDT">USDT</button>
+        </div>
         <button class="btn btn-primary btn-lg btn-block" id="btn-join-tournament">
           UNIRSE AL TORNEO
         </button>
+        <span class="entry-fee-hint" id="entry-fee-hint">Entrada <strong>$0.25</strong> · paga con cUSD o USDT</span>
         <span class="badge badge-antitramp">Anti-Trampa Verificado</span>
       </div>
 
@@ -2444,7 +2538,8 @@
         <span class="online-dot"></span>
         <span id="online-count-val">23</span>&nbsp;jugadores en línea ahora
       </div>
-      <div id="tourney-countdown">⏰ Torneo cierra en <span id="tourney-countdown-val">14:32</span></div>
+      <div id="tourney-countdown">⏰ Torneo cierra en <span id="tourney-countdown-val">59:59</span></div>
+      <div id="tourney-players"><strong id="tourney-player-count">0</strong> / 10 jugadores mín. · <span id="tourney-pool-hint">$0.00 cUSD pool</span></div>
       <div id="activity-feed"></div>
 
       <div class="home-music-controls" id="home-music-controls">
@@ -2657,6 +2752,9 @@
     <button onclick="showScreen('result-screen')" data-screen="result-screen">Result</button>
   </nav>
 
+  <script src="contract-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+  <script src="tournament-chain.js"></script>
   <script src="supabase-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
@@ -4961,8 +5059,10 @@
       });
     }
 
-    /* ── Home: Prize Pool ── */
-    let poolBase = 4.75;
+    /* ── Home: Prize Pool (torneo horario on-chain) ── */
+    let poolBase = 0;
+    let tournamentPlayerCount = 0;
+    let tournamentRefreshTimer = null;
 
     const POOL_SPLITS = {
       first: 0.40,
@@ -4970,6 +5070,120 @@
       third: 0.16,
       creator: 0.20
     };
+
+    async function syncTournamentFromChain() {
+      if (!window.TapBeatChain) return;
+      try {
+        var win = await TapBeatChain.refreshTournamentState();
+        tournamentPlayerCount = win.playerCount || 0;
+        var entryUsd = TapBeatChain.getEntryFeeUsd();
+        var pools = TapBeatChain.computePoolUsd(tournamentPlayerCount, entryUsd);
+        poolBase = win.prizePoolUsd != null ? win.prizePoolUsd : pools.net;
+        updatePoolDisplay();
+        updateTournamentUI(win);
+      } catch (e) {
+        console.warn('TapBeat: sync tournament', e);
+      }
+    }
+
+    function updateTournamentUI(win) {
+      if (!win) win = TapBeatChain ? TapBeatChain.getTournamentWindow() : null;
+      if (!win) return;
+
+      var countdownEl = document.getElementById('tourney-countdown-val');
+      if (countdownEl) {
+        countdownEl.textContent = TapBeatChain.formatCountdown(win.secondsLeft);
+        countdownEl.style.color = win.secondsLeft < 60 ? '#ff3355' : win.secondsLeft < 180 ? '#ffaa00' : '';
+      }
+
+      var countEl = document.getElementById('tourney-player-count');
+      if (countEl) countEl.textContent = String(tournamentPlayerCount);
+
+      var poolHint = document.getElementById('tourney-pool-hint');
+      if (poolHint) {
+        if (tournamentPlayerCount < 1 && TapBeatChain) {
+          var minPool = TapBeatChain.computePoolUsd(10, TapBeatChain.getEntryFeeUsd()).net;
+          poolHint.textContent = 'Pool mín. $' + minPool.toFixed(2) + ' con 10 jugadores';
+        } else {
+          poolHint.textContent = '$' + poolBase.toFixed(2) + ' cUSD pool neto';
+        }
+      }
+
+      var viralEl = document.getElementById('tourney-viral-badge');
+      if (viralEl) {
+        viralEl.hidden = !TapBeatChain.isViral(tournamentPlayerCount);
+      }
+
+      var joinBtn = document.getElementById('btn-join-tournament');
+      if (joinBtn && TapBeatChain) {
+        joinBtn.textContent = TapBeatChain.getJoinLabel();
+      }
+
+      var feeHint = document.getElementById('entry-fee-hint');
+      if (feeHint && TapBeatChain) {
+        var chainState = TapBeatChain.getState();
+        if (chainState.hasFreePlay) {
+          feeHint.innerHTML = 'Tu <strong>primera entrada es GRATIS</strong> · luego $' +
+            TapBeatChain.getEntryFeeUsd().toFixed(2) + ' con cUSD o USDT';
+        } else {
+          feeHint.innerHTML = 'Entrada <strong>$' + TapBeatChain.getEntryFeeUsd().toFixed(2) +
+            '</strong> · mín. 10 jugadores o reembolso automático';
+        }
+      }
+    }
+
+    function updateWalletUI() {
+      if (!window.TapBeatChain) return;
+      var bar = document.getElementById('wallet-bar');
+      var addrEl = document.getElementById('wallet-addr');
+      var demoBadge = document.getElementById('wallet-demo-badge');
+      var state = TapBeatChain.getState();
+      if (state.wallet && bar && addrEl) {
+        bar.hidden = false;
+        addrEl.textContent = TapBeatChain.getWalletShort();
+        if (demoBadge) demoBadge.hidden = !state.demoMode;
+      }
+    }
+
+    async function recordTournamentEntry(joinResult) {
+      if (!supabaseClient || !joinResult || !joinResult.ok) return;
+      var state = TapBeatChain.getState();
+      var win = joinResult.tournament || TapBeatChain.getTournamentWindow();
+      var wallet = state.wallet;
+      if (!wallet) return;
+
+      var username = getStoredUser();
+      var token = TapBeatChain.getSelectedToken();
+      var feeUsd = joinResult.wasFree ? 0 : TapBeatChain.getEntryFeeUsd();
+
+      await supabaseClient.from('tournaments').upsert({
+        id: win.id,
+        tier: 'basic',
+        entry_fee_usd: TapBeatChain.getEntryFeeUsd(),
+        player_count: tournamentPlayerCount,
+        prize_pool_usd: poolBase,
+        starts_at: win.start.toISOString(),
+        ends_at: win.end.toISOString(),
+        status: 'open'
+      }, { onConflict: 'id' });
+
+      await supabaseClient.from('tournament_entries').upsert({
+        tournament_id: win.id,
+        user_id: currentUserId || null,
+        wallet_address: wallet.toLowerCase(),
+        username: username,
+        token_symbol: token.symbol,
+        fee_paid_usd: feeUsd,
+        was_free: !!joinResult.wasFree,
+        tx_hash: joinResult.txHash || null
+      }, { onConflict: 'tournament_id,wallet_address' });
+
+      if (currentUserId) {
+        await supabaseClient.from('profiles').update({
+          wallet_address: wallet.toLowerCase()
+        }).eq('id', currentUserId);
+      }
+    }
 
     const DEFAULT_LEADERBOARD = [
       { name: 'NEON_KING',    score: 980, avgTime: '14 clicks', isPlayer: false, hasPlayed: true },
@@ -5072,6 +5286,21 @@
         }
 
         await refreshLeaderboardFromServer();
+      }
+
+      if (supabaseClient && currentUserId && window.TapBeatChain) {
+        var chainState = TapBeatChain.getState();
+        var win = TapBeatChain.getTournamentWindow();
+        if (chainState.wallet) {
+          await supabaseClient.from('tournament_entries').upsert({
+            tournament_id: win.id,
+            user_id: currentUserId,
+            wallet_address: chainState.wallet.toLowerCase(),
+            username: username,
+            score: score,
+            avg_clicks: avgClicks !== null ? avgClicks : null
+          }, { onConflict: 'tournament_id,wallet_address' });
+        }
       }
 
       renderLeaderboard();
@@ -5287,20 +5516,17 @@
     }
     setInterval(updateOnlineCount, 3800);
 
-    /* ── PSYCH 3: Tournament countdown timer ── */
-    var tourneySeconds = 14 * 60 + 32;
+    /* ── Torneo horario: countdown real cada hora ── */
     function updateTourneyTimer() {
-      tourneySeconds--;
-      if (tourneySeconds < 0) tourneySeconds = 18 * 60;
-      var m = Math.floor(tourneySeconds / 60);
-      var s = tourneySeconds % 60;
-      var el = document.getElementById('tourney-countdown-val');
-      if (el) {
-        el.textContent = m + ':' + String(s).padStart(2, '0');
-        el.style.color = tourneySeconds < 60 ? '#ff3355' : tourneySeconds < 180 ? '#ffaa00' : '';
+      if (!window.TapBeatChain) return;
+      var win = TapBeatChain.getTournamentWindow();
+      updateTournamentUI(win);
+      if (win.secondsLeft <= 0) {
+        syncTournamentFromChain();
       }
     }
     setInterval(updateTourneyTimer, 1000);
+    updateTourneyTimer();
 
     /* ── PSYCH 3: Activity feed ── */
     var FEED_NAMES = ['NEON_KING','CyberPulse','GridRunner','PhantomBeat','VoidSync',
@@ -5372,14 +5598,57 @@
       updatePoolDisplay();
 
       if (poolInterval) { clearInterval(poolInterval); }
-      poolInterval = setInterval(function () {
-        poolBase += 0.25;
-        updatePoolDisplay();
-      }, 8000);
+      poolInterval = null;
 
-      document.getElementById('btn-join-tournament').addEventListener('click', function () {
-        initAudio();
-        showScreen('welcome-screen');
+      if (tournamentRefreshTimer) { clearInterval(tournamentRefreshTimer); }
+      tournamentRefreshTimer = setInterval(function () {
+        syncTournamentFromChain();
+      }, 15000);
+      syncTournamentFromChain();
+
+      document.querySelectorAll('#token-select button').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          document.querySelectorAll('#token-select button').forEach(function (b) {
+            b.classList.toggle('active', b === btn);
+          });
+          if (window.TapBeatChain) {
+            TapBeatChain.setSelectedToken(btn.dataset.token);
+            updateTournamentUI();
+          }
+        });
+      });
+
+      if (window.TapBeatChain) {
+        TapBeatChain.autoConnectMiniPay().then(function () {
+          updateWalletUI();
+          syncTournamentFromChain();
+        });
+      }
+
+      var joinBtn = document.getElementById('btn-join-tournament');
+      joinBtn.addEventListener('click', async function () {
+        joinBtn.disabled = true;
+        var originalText = joinBtn.textContent;
+        joinBtn.textContent = 'Conectando…';
+        try {
+          initAudio();
+          if (!window.TapBeatChain) throw new Error('Blockchain no cargada');
+          if (!TapBeatChain.getState().wallet) {
+            await TapBeatChain.connectWallet();
+            updateWalletUI();
+          }
+          joinBtn.textContent = 'Procesando entrada…';
+          var result = await TapBeatChain.joinTournament();
+          await recordTournamentEntry(result);
+          await syncTournamentFromChain();
+          showScreen('welcome-screen');
+        } catch (err) {
+          console.error('TapBeat: join tournament', err);
+          alert(err.message || 'No se pudo unir al torneo. Abre en MiniPay con cUSD o USDT.');
+        } finally {
+          joinBtn.disabled = false;
+          joinBtn.textContent = window.TapBeatChain ? TapBeatChain.getJoinLabel() : originalText;
+        }
       });
 
       document.getElementById('btn-continue-tournament').addEventListener('click', function () {
