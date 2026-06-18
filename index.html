@@ -2536,7 +2536,7 @@
       <!-- 3. PRUEBA SOCIAL — jugadores, timer, feed y música -->
       <div id="players-online-badge">
         <span class="online-dot"></span>
-        <span id="online-count-val">23</span>&nbsp;jugadores en línea ahora
+        <span id="online-count-val">0</span>&nbsp;jugadores en este torneo
       </div>
       <div id="tourney-countdown">⏰ Torneo cierra en <span id="tourney-countdown-val">59:59</span></div>
       <div id="tourney-players"><strong id="tourney-player-count">0</strong> / 10 jugadores mín. · <span id="tourney-pool-hint">$0.00 cUSD pool</span></div>
@@ -5076,11 +5076,10 @@
       try {
         var win = await TapBeatChain.refreshTournamentState();
         tournamentPlayerCount = win.playerCount || 0;
-        var entryUsd = TapBeatChain.getEntryFeeUsd();
-        var pools = TapBeatChain.computePoolUsd(tournamentPlayerCount, entryUsd);
-        poolBase = win.prizePoolUsd != null ? win.prizePoolUsd : pools.net;
+        poolBase = win.prizePoolUsd != null ? win.prizePoolUsd : 0;
         updatePoolDisplay();
         updateTournamentUI(win);
+        await refreshActivityFeed();
       } catch (e) {
         console.warn('TapBeat: sync tournament', e);
       }
@@ -5099,11 +5098,16 @@
       var countEl = document.getElementById('tourney-player-count');
       if (countEl) countEl.textContent = String(tournamentPlayerCount);
 
+      var onlineEl = document.getElementById('online-count-val');
+      if (onlineEl) onlineEl.textContent = String(tournamentPlayerCount);
+
       var poolHint = document.getElementById('tourney-pool-hint');
       if (poolHint) {
         if (tournamentPlayerCount < 1 && TapBeatChain) {
           var minPool = TapBeatChain.computePoolUsd(10, TapBeatChain.getEntryFeeUsd()).net;
-          poolHint.textContent = 'Pool mín. $' + minPool.toFixed(2) + ' con 10 jugadores';
+          poolHint.textContent = 'Pool mín. $' + minPool.toFixed(2) + ' con 10 jugadores pagados';
+        } else if (poolBase <= 0 && tournamentPlayerCount > 0) {
+          poolHint.textContent = tournamentPlayerCount + ' inscritos · $0.00 pool (solo entradas gratis por ahora)';
         } else {
           poolHint.textContent = '$' + poolBase.toFixed(2) + ' cUSD pool neto';
         }
@@ -5506,16 +5510,6 @@
       });
     }
 
-    /* ── PSYCH 3: Players online counter ── */
-    var onlineCount = 23;
-    function updateOnlineCount() {
-      var delta = Math.random() > 0.45 ? 1 : -1;
-      onlineCount = Math.max(12, Math.min(68, onlineCount + delta));
-      var el = document.getElementById('online-count-val');
-      if (el) el.textContent = onlineCount;
-    }
-    setInterval(updateOnlineCount, 3800);
-
     /* ── Torneo horario: countdown real cada hora ── */
     function updateTourneyTimer() {
       if (!window.TapBeatChain) return;
@@ -5528,47 +5522,107 @@
     setInterval(updateTourneyTimer, 1000);
     updateTourneyTimer();
 
-    /* ── PSYCH 3: Activity feed ── */
-    var FEED_NAMES = ['NEON_KING','CyberPulse','GridRunner','PhantomBeat','VoidSync',
-      'CarlosV_CLO','Ana_B','MiguelR','LuisD99','SofiaM','ElRayo','LaVeloz',
-      'TapKing','BeatMstr','ReflexGod','Pipe_K','Mafe22','JuanPx'];
-    var FEED_CITIES = ['Cali','Bogotá','Medellín','Barranquilla','Bucaramanga','Cúcuta'];
-    var feedRunning = false;
+    /* ── Activity feed en vivo (Supabase + on-chain) ── */
+    var activityFeedItems = [];
+    var activityFeedIndex = 0;
+    var activityFeedTimer = null;
 
-    function getFeedMessage() {
-      var name = FEED_NAMES[Math.floor(Math.random() * FEED_NAMES.length)];
-      var city = FEED_CITIES[Math.floor(Math.random() * FEED_CITIES.length)];
-      var clicks = Math.floor(Math.random() * 8) + 6;
-      var pool = (poolBase + Math.random() * 2).toFixed(2);
-      var streak = Math.floor(Math.random() * 5) + 3;
-      var msgs = [
-        '<span class="feed-name">' + name + '</span> de ' + city + ' acaba de entrar al torneo',
-        '⚡ <span class="feed-name">' + name + '</span> logró <span class="feed-money">' + clicks + ' clicks</span> en una ronda',
-        '💰 El prize pool subió a <span class="feed-money">$' + pool + ' cUSD</span>',
-        '🔥 <span class="feed-name">' + name + '</span> lleva una racha de <span class="feed-money">' + streak + '</span> rondas perfectas',
-        '🏆 <span class="feed-name">' + name + '</span> de ' + city + ' lidera el torneo',
-        '⚡ <span class="feed-money">' + (Math.floor(Math.random() * 10) + 8) + '</span> jugadores entraron en los últimos 5 minutos'
-      ];
-      return msgs[Math.floor(Math.random() * msgs.length)];
+    function shortWallet(addr) {
+      if (!addr || addr.length < 10) return 'Jugador';
+      return addr.slice(0, 6) + '…' + addr.slice(-4);
     }
 
-    function showNextFeedItem() {
-      if (!feedRunning) return;
+    function buildActivityFeedItems(entries, win) {
+      var items = [];
+      var minPlayers = TapBeatChain ? TapBeatChain.getConfig().minPlayers : 10;
+
+      items.push(
+        '⏰ Torneo #' + win.id + ' · cierra en <span class="feed-money">' +
+        TapBeatChain.formatCountdown(win.secondsLeft) + '</span>'
+      );
+
+      if (tournamentPlayerCount > 0) {
+        items.push(
+          '💰 Pool neto real: <span class="feed-money">$' + poolBase.toFixed(2) + ' cUSD</span> · ' +
+          '<span class="feed-money">' + tournamentPlayerCount + '</span>/' + minPlayers + ' jugadores'
+        );
+      } else {
+        items.push('🎮 Sé el primero en unirte — entrada gratis la 1ª vez');
+      }
+
+      if (entries && entries.length) {
+        entries.forEach(function (row) {
+          var name = row.username || shortWallet(row.wallet_address);
+          if (row.score && row.score > 0) {
+            items.push(
+              '🏆 <span class="feed-name">' + name + '</span> anotó ' +
+              '<span class="feed-money">' + row.score + ' pts</span> en este torneo'
+            );
+          } else if (row.was_free) {
+            items.push(
+              '✅ <span class="feed-name">' + name + '</span> entró al torneo (entrada gratis)'
+            );
+          } else if (row.fee_paid_usd > 0) {
+            items.push(
+              '💵 <span class="feed-name">' + name + '</span> pagó ' +
+              '<span class="feed-money">$' + Number(row.fee_paid_usd).toFixed(2) + '</span> y entró'
+            );
+          } else {
+            items.push(
+              '⚡ <span class="feed-name">' + name + '</span> se unió al torneo de esta hora'
+            );
+          }
+        });
+      }
+
+      if (tournamentPlayerCount >= minPlayers) {
+        items.push('🔥 Mínimo alcanzado — el torneo <span class="feed-money">correrá</span> al cerrar la hora');
+      } else if (tournamentPlayerCount > 0) {
+        var faltan = minPlayers - tournamentPlayerCount;
+        items.push(
+          '⌛ Faltan <span class="feed-money">' + faltan + '</span> jugadores para activar premios (o reembolso)'
+        );
+      }
+
+      return items;
+    }
+
+    function showActivityFeedSlide() {
       var feed = document.getElementById('activity-feed');
-      if (!feed) return;
+      if (!feed || !activityFeedItems.length) return;
       var el = document.createElement('div');
       el.className = 'feed-item';
-      el.innerHTML = getFeedMessage();
+      el.innerHTML = activityFeedItems[activityFeedIndex % activityFeedItems.length];
+      activityFeedIndex++;
       feed.innerHTML = '';
       feed.appendChild(el);
-      setTimeout(showNextFeedItem, 4400);
     }
 
-    function startActivityFeed() {
-      feedRunning = true;
-      setTimeout(showNextFeedItem, 1800);
+    async function refreshActivityFeed() {
+      if (!window.TapBeatChain) return;
+      var win = TapBeatChain.getTournamentWindow();
+      var entries = [];
+
+      if (supabaseClient) {
+        try {
+          var result = await supabaseClient
+            .from('tournament_entries')
+            .select('username,wallet_address,score,was_free,fee_paid_usd,entered_at')
+            .eq('tournament_id', win.id)
+            .order('entered_at', { ascending: false })
+            .limit(8);
+          if (!result.error && result.data) entries = result.data;
+        } catch (e) {
+          console.warn('TapBeat: activity feed', e);
+        }
+      }
+
+      activityFeedItems = buildActivityFeedItems(entries, win);
+      showActivityFeedSlide();
+
+      if (activityFeedTimer) clearInterval(activityFeedTimer);
+      activityFeedTimer = setInterval(showActivityFeedSlide, 5000);
     }
-    startActivityFeed();
 
     /* ─── Hook streak fire into existing game logic ─── */
     /* Monkey-patch updateGameUI to trigger streak effects */

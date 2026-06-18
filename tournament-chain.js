@@ -13,6 +13,7 @@
     provider: null,
     signer: null,
     contract: null,
+    readContract: null,
     selectedToken: 'USDm',
     currentTournament: null,
     entered: false,
@@ -150,9 +151,24 @@
     return cfg.tokens[state.selectedToken] || cfg.tokens.USDm;
   }
 
-  async function readOnChainTournament(tournamentId) {
-    if (!state.contract) return null;
-    var t = await state.contract.getTournament(tournamentId);
+  async function getReadOnlyContract() {
+    if (!hasContract() || !global.ethers) return null;
+    if (!state.readContract) {
+      var provider = new global.ethers.JsonRpcProvider(cfg.rpcUrl);
+      state.readContract = new global.ethers.Contract(cfg.contractAddress, cfg.abi, provider);
+    }
+    return state.readContract;
+  }
+
+  function netPoolFromUsd6(usd6) {
+    var gross = Number(usd6) / 1e6;
+    return gross * (1 - (cfg.creatorBps || 2000) / 10000);
+  }
+
+  async function readOnChainTournament(tournamentId, contract) {
+    var reader = contract || state.contract || await getReadOnlyContract();
+    if (!reader) return null;
+    var t = await reader.getTournament(tournamentId);
     return {
       tier: Number(t[0]),
       startTime: Number(t[1]),
@@ -169,21 +185,29 @@
     var win = getTournamentWindow();
     state.currentTournament = win;
 
-    if (state.contract && state.wallet) {
-      try {
-        state.entered = await state.contract.hasEntered(win.id, state.wallet);
-        var onChain = await readOnChainTournament(win.id);
-        if (onChain) {
-          win.playerCount = onChain.playerCount;
-          win.prizePoolUsd = Number(onChain.prizePoolUsd6) / 1e6;
-          win.onChain = onChain;
+    try {
+      if (hasContract()) {
+        var reader = await getReadOnlyContract();
+        if (reader) {
+          var onChain = await readOnChainTournament(win.id, reader);
+          if (onChain && onChain.startTime > 0) {
+            win.playerCount = onChain.playerCount;
+            win.prizePoolUsd = netPoolFromUsd6(onChain.prizePoolUsd6);
+            win.onChain = onChain;
+          }
+          if (state.wallet) {
+            state.entered = await reader.hasEntered(win.id, state.wallet);
+            if (!state.contract) {
+              state.hasFreePlay = !(await reader.hasPlayedFree(state.wallet));
+            }
+          }
         }
-      } catch (e) {
-        console.warn('TapBeat: read tournament', e);
+      } else {
+        win.playerCount = parseInt(localStorage.getItem('tapbeat_demo_players_' + win.id) || '0', 10);
+        win.prizePoolUsd = computePoolUsd(win.playerCount, getEntryFeeUsd()).net;
       }
-    } else {
-      win.playerCount = win.playerCount || parseInt(localStorage.getItem('tapbeat_demo_players_' + win.id) || '0', 10);
-      win.prizePoolUsd = computePoolUsd(win.playerCount, getEntryFeeUsd()).net;
+    } catch (e) {
+      console.warn('TapBeat: read tournament', e);
     }
     return win;
   }
