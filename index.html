@@ -5212,13 +5212,24 @@
         alert('+$' + usdAmount + ' ' + tokenKey + ' añadidos al pool del torneo actual.');
       } catch (err) {
         console.error('TapBeat: sponsor pool', err);
-        alert(err.message || 'No se pudo patrocinar el pool. ¿Tienes USDT/cUSD de testnet?');
+        alert(friendlyChainError(err));
       } finally {
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = '+ $' + usdAmount + ' ' + (tokenKey === 'USDT' ? 'USDT' : 'cUSD');
-        }
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '+ $' + usdAmount + ' ' + (tokenKey === 'USDT' ? 'USDT' : 'cUSD');
       }
+    }
+
+    function friendlyChainError(err) {
+      var msg = (err && err.message) ? err.message : String(err);
+      if (msg.indexOf('not exists') >= 0) {
+        return 'El torneo de esta hora no existía on-chain. Se intentó crear; recarga e inténtalo de nuevo.';
+      }
+      if (msg.indexOf('insufficient funds') >= 0 || msg.indexOf('transfer failed') >= 0) {
+        return 'No tienes suficiente cUSD/USDT o CELO para gas en Celo Sepolia.';
+      }
+      return msg;
+    }
     }
 
     async function recordTournamentEntry(joinResult) {

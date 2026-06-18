@@ -47,6 +47,8 @@
       id: Math.floor(start.getTime() / 3600000),
       start: start,
       end: end,
+      startSec: Math.floor(start.getTime() / 1000),
+      endSec: Math.floor(end.getTime() / 1000),
       secondsLeft: Math.max(0, Math.floor((end - now) / 1000))
     };
   }
@@ -253,7 +255,11 @@
     var entryUsd = getEntryFeeUsd();
     var isFree = state.hasFreePlay;
 
-    if (state.contract && hasContract()) {
+    if (hasContract()) {
+      if (!state.contract && state.signer) {
+        state.contract = new global.ethers.Contract(cfg.contractAddress, cfg.abi, state.signer);
+      }
+      await ensureTournamentExists();
       var tokenEnum = state.selectedToken === 'USDT' ? Token.USDT : Token.USDm;
       if (!isFree) {
         var usd6 = BigInt(Math.round(entryUsd * 1e6));
@@ -302,6 +308,34 @@
     }
   }
 
+  async function ensureTournamentExists() {
+    var win = getTournamentWindow();
+    var reader = await getReadOnlyContract();
+    if (!reader) return win;
+
+    var onChain = await readOnChainTournament(win.id, reader);
+    if (onChain && onChain.startTime > 0) return win;
+
+    if (!state.wallet) await connectWallet();
+    var isOwner = await isContractOwner();
+    if (!isOwner) {
+      throw new Error(
+        'El torneo de esta hora aún no está abierto on-chain. El admin debe ejecutar npm run setup-tournament.'
+      );
+    }
+
+    if (!state.contract) {
+      state.contract = new global.ethers.Contract(cfg.contractAddress, cfg.abi, state.signer);
+    }
+
+    var tier = (cfg.tiers && cfg.tiers.basic && cfg.tiers.basic.id) || 1;
+    var tx = await state.contract.createTournament(
+      win.id, tier, win.startSec, win.endSec
+    );
+    await tx.wait();
+    return win;
+  }
+
   async function sponsorPool(usdAmount, tokenKey) {
     if (!hasContract()) throw new Error('Contrato no configurado');
     if (!state.wallet) await connectWallet();
@@ -312,6 +346,8 @@
     if (!state.contract) {
       state.contract = new global.ethers.Contract(cfg.contractAddress, cfg.abi, state.signer);
     }
+
+    await ensureTournamentExists();
 
     var parsed = usdToTokenAmount(tokenKey || state.selectedToken, usdAmount);
     await approveTokenIfNeeded(tokenKey || state.selectedToken, parsed.amountWei);
