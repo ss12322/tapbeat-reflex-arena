@@ -2,7 +2,10 @@
 
 Juego web de reflejos y ritmo. Escucha la señal de audio, toca el botón **TAP** lo más rápido posible y acumula clicks antes de que termine cada ronda.
 
-**Jugar en línea:** https://ss12322.github.io/tapbeat-reflex-arena/
+**Jugar en línea:**
+
+- GitHub Pages: https://ss12322.github.io/tapbeat-reflex-arena/
+- Vercel: https://tapbeat-reflex-arena.vercel.app/
 
 ---
 
@@ -277,7 +280,23 @@ python -m http.server 8080
 
 3. Visita `http://localhost:8080`.
 
-> Usa un servidor local (no `file://`) para que Supabase y el audio funcionen correctamente.
+> Usa un servidor local (no `file://`) para que Supabase, Rabby/MiniPay y el audio funcionen correctamente.
+
+---
+
+## Desplegar en Vercel
+
+El proyecto ya está en GitHub: https://github.com/ss12322/tapbeat-reflex-arena
+
+1. Entra en [vercel.com](https://vercel.com) e inicia sesión con GitHub.
+2. **Add New Project** → importa `ss12322/tapbeat-reflex-arena`.
+3. Deja **Framework Preset: Other** (es HTML estático, sin build).
+4. **Root Directory:** `.` (raíz del repo).
+5. Pulsa **Deploy**.
+
+Cada `git push` a `main` actualiza Vercel automáticamente.
+
+**Importante:** el archivo `.env` con tu clave privada **no** va a GitHub ni a Vercel (está en `.gitignore`). El frontend solo necesita `contract-config.js`, que ya incluye la dirección del contrato en Sepolia.
 
 ---
 

@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "name": "tapbeat-reflex-arena",
+  "buildCommand": "",
+  "outputDirectory": ".",
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" }
+      ]
+    }
+  ]
+}
