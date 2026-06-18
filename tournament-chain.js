@@ -34,10 +34,14 @@
 
   function getTournamentWindow() {
     var now = new Date();
-    var start = new Date(now);
-    start.setMinutes(0, 0, 0);
-    var end = new Date(start);
-    end.setHours(end.getHours() + 1);
+    var start = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      now.getUTCHours(),
+      0, 0, 0
+    ));
+    var end = new Date(start.getTime() + 3600000);
     return {
       id: Math.floor(start.getTime() / 3600000),
       start: start,

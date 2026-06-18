@@ -1,0 +1,17 @@
+{
+  "name": "tapbeat-reflex-arena",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "node scripts/deploy-contract.mjs",
+    "setup-tournament": "node scripts/setup-tournament.mjs",
+    "cron": "node scripts/tournament-cron.mjs",
+    "cron:dry": "node scripts/tournament-cron.mjs --dry-run"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "ethers": "^6.13.4",
+    "solc": "^0.8.24"
+  }
+}

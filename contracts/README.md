@@ -1,5 +1,17 @@
 # Deploy TapBeatTournament en Celo Sepolia
 
+## Opción rápida (recomendada)
+
+```bash
+cp .env.example .env
+# Edita PRIVATE_KEY con tu wallet de testnet
+npm install
+npm run deploy
+npm run setup-tournament
+```
+
+`npm run deploy` compila con `solc`, despliega y actualiza `contract-config.js` automáticamente.
+
 ## Tokens (testnet)
 
 | Token | Dirección |
@@ -7,40 +19,18 @@
 | cUSD / USDm | `0xEF4d55D6dE8e8d73232827Cd1e9b2F2dBb45bC80` |
 | USDT | `0xd077A400968890Eacc75cdc901F0356c943e4fDb` |
 
-## Opción A — Remix (recomendado)
+## Opción Remix
 
-1. Abre [Remix](https://remix.ethereum.org) y crea `TapBeatTournament.sol` (copia desde `contracts/`).
-2. Compila con Solidity **0.8.24**.
-3. Deploy en **Celo Sepolia** (Chain ID `11142220`):
-   - `_usdm_`: `0xEF4d55D6dE8e8d73232827Cd1e9b2F2dBb45bC80`
-   - `_usdt_`: `0xd077A400968890Eacc75cdc901F0356c943e4fDb`
-   - `_oracle_`: tu wallet backend (puede ser la misma del deploy)
-4. Copia la dirección del contrato en `contract-config.js` → `contractAddress`.
+1. [Remix](https://remix.ethereum.org) → pegar `TapBeatTournament.sol`
+2. Deploy en Celo Sepolia (Chain ID `11142220`)
+3. Constructor: USDM, USDT, oracle address
+4. Pega la dirección en `contract-config.js` y `.env`
 
-## Opción B — Foundry
+## Cron oracle
 
 ```bash
-forge install foundry-rs/forge-std --no-commit
-export PRIVATE_KEY=0x...
-export TAPBEAT_ORACLE=0xTuWalletOracle
-forge script script/DeployTapBeat.s.sol:DeployTapBeat --rpc-url celo_sepolia --broadcast
+npm run cron        # cierra hora anterior + crea hora actual
+npm run cron:dry    # simulación
 ```
 
-## Crear torneo horario (owner)
-
-Cada hora, el owner debe llamar `createTournament` con:
-
-- `tournamentId`: `Math.floor(Date.now() / 3600000)` (misma fórmula que el frontend)
-- `tier`: `1` (Basic = $0.25)
-- `startTime` / `endTime`: inicio y fin de la hora en unix timestamp
-
-## Cierre automático (oracle)
-
-Al terminar la hora:
-
-1. `closeTournament(id)` — si `< 10` jugadores → `refundAll(id)`
-2. Si `>= 10` → calcular top 3 en Supabase → `finalizeTournament(id, [w1,w2,w3])`
-
-## Frontend
-
-Tras deploy, pega la dirección en `contract-config.js`. Sin dirección, el juego funciona en **modo demo** (sin cobro real).
+O deja que GitHub Actions lo ejecute (ver README → secrets).

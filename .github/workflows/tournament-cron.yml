@@ -1,0 +1,29 @@
+name: Tournament Oracle Cron
+
+on:
+  schedule:
+    # Cada hora al minuto 3 UTC — cierra la hora anterior y abre la actual
+    - cron: '3 * * * *'
+  workflow_dispatch:
+
+jobs:
+  oracle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run tournament cron
+        env:
+          PRIVATE_KEY: ${{ secrets.TAPBEAT_PRIVATE_KEY }}
+          CONTRACT_ADDRESS: ${{ secrets.TAPBEAT_CONTRACT_ADDRESS }}
+          SUPABASE_URL: ${{ secrets.TAPBEAT_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.TAPBEAT_SUPABASE_ANON_KEY }}
+          RPC_URL: https://forno.celo-sepolia.celo-testnet.org
+        run: npm run cron

@@ -123,6 +123,47 @@ Sin `contractAddress`, el juego corre en **modo demo** (sin cobro real, primera 
 
 Abre la app dentro de MiniPay en Celo Sepolia. El botón **UNIRSE** conecta la wallet, aprueba el token y llama `enterTournament`.
 
+### Deploy del contrato (Celo Sepolia)
+
+1. Consigue CELO de testnet en el [faucet de Celo Sepolia](https://faucet.celo.org/).
+2. Copia `.env.example` → `.env` y completa `PRIVATE_KEY`.
+3. Instala dependencias y despliega:
+
+```bash
+npm install
+npm run deploy
+npm run setup-tournament
+```
+
+Esto compila el contrato, lo despliega, actualiza `contract-config.js` y crea el torneo de la hora actual.
+
+### Cron automático (cada hora)
+
+El script `scripts/tournament-cron.mjs` hace:
+
+1. **Cierra** el torneo de la hora anterior (`closeTournament`).
+2. Si hay **&lt; 10 jugadores** → `refundAll` (reembolso).
+3. Si hay **≥ 10** → lee top 3 en Supabase → `finalizeTournament` (premios).
+4. **Crea** el torneo de la hora actual si no existe.
+
+**Local:**
+
+```bash
+npm run cron:dry   # simular sin transacciones
+npm run cron       # ejecutar de verdad
+```
+
+**GitHub Actions** (automático cada hora): configura estos secrets en el repo:
+
+| Secret | Descripción |
+|--------|-------------|
+| `TAPBEAT_PRIVATE_KEY` | Wallet oracle/owner con CELO Sepolia |
+| `TAPBEAT_CONTRACT_ADDRESS` | Dirección del contrato desplegado |
+| `TAPBEAT_SUPABASE_URL` | URL de Supabase |
+| `TAPBEAT_SUPABASE_ANON_KEY` | Anon key (lee scores del torneo) |
+
+Los torneos usan **hora UTC** (misma fórmula en frontend y cron).
+
 ---
 
 ## Estructura del proyecto
@@ -132,6 +173,13 @@ Abre la app dentro de MiniPay en Celo Sepolia. El botón **UNIRSE** conecta la w
 ├── index.html          # Juego completo (HTML, CSS y JavaScript)
 ├── contract-config.js  # Celo Sepolia + dirección del contrato
 ├── tournament-chain.js # MiniPay / pagos cUSD y USDT
+├── package.json        # Scripts deploy y cron
+├── scripts/
+│   ├── deploy-contract.mjs
+│   ├── setup-tournament.mjs
+│   └── tournament-cron.mjs
+├── .github/workflows/
+│   └── tournament-cron.yml
 ├── contracts/
 │   ├── TapBeatTournament.sol
 │   └── README.md
