@@ -4024,12 +4024,16 @@
 
     /* ══════════════════════════════════
        SISTEMA DE TENSIÓN PSICOLÓGICA
-       6 capas envolventes — intensidad escala con la ronda (0→9)
+       Capa de fondo continua en partida + refuerzo en espera de señal
        ══════════════════════════════════ */
 
-    var tensionNodes = null;
     var tensionPulseTimer = null;
     var tensionActive = false;
+
+    var gameBedNodes = null;
+    var gameBedActive = false;
+    var gameBedWaitMode = false;
+    var GAME_BED_DURATION_SEC = 720;
 
     function getTensionProfile(roundIndex) {
       var idx = Math.max(0, Math.min(roundIndex, TOTAL_ROUNDS - 1));
@@ -4059,7 +4063,9 @@
       };
     }
 
-    function stopTensionAudio() {
+    function stopGameBed() {
+      gameBedActive = false;
+      gameBedWaitMode = false;
       tensionActive = false;
 
       if (tensionPulseTimer) {
@@ -4067,320 +4073,306 @@
         tensionPulseTimer = null;
       }
 
-      if (!tensionNodes) return;
+      if (!gameBedNodes || !audioCtx) {
+        gameBedNodes = null;
+        return;
+      }
 
-      var t = audioCtx ? audioCtx.currentTime : 0;
-
+      var t = audioCtx.currentTime;
       try {
-        if (tensionNodes.master) {
-          tensionNodes.master.gain.cancelScheduledValues(t);
-          tensionNodes.master.gain.setValueAtTime(tensionNodes.master.gain.value, t);
-          tensionNodes.master.gain.linearRampToValueAtTime(0, t + 0.15);
-        }
-        if (tensionNodes.droneGain) {
-          tensionNodes.droneGain.gain.cancelScheduledValues(t);
-          tensionNodes.droneGain.gain.setValueAtTime(tensionNodes.droneGain.gain.value, t);
-          tensionNodes.droneGain.gain.linearRampToValueAtTime(0, t + 0.15);
-        }
-        if (tensionNodes.subGain) {
-          tensionNodes.subGain.gain.cancelScheduledValues(t);
-          tensionNodes.subGain.gain.setValueAtTime(tensionNodes.subGain.gain.value, t);
-          tensionNodes.subGain.gain.linearRampToValueAtTime(0, t + 0.15);
-        }
-        if (tensionNodes.shepardMaster) {
-          tensionNodes.shepardMaster.gain.cancelScheduledValues(t);
-          tensionNodes.shepardMaster.gain.setValueAtTime(tensionNodes.shepardMaster.gain.value, t);
-          tensionNodes.shepardMaster.gain.linearRampToValueAtTime(0, t + 0.15);
-        }
-        if (tensionNodes.ambientGain) {
-          tensionNodes.ambientGain.gain.cancelScheduledValues(t);
-          tensionNodes.ambientGain.gain.setValueAtTime(tensionNodes.ambientGain.gain.value, t);
-          tensionNodes.ambientGain.gain.linearRampToValueAtTime(0, t + 0.12);
-        }
-        if (tensionNodes.noiseGain) {
-          tensionNodes.noiseGain.gain.cancelScheduledValues(t);
-          tensionNodes.noiseGain.gain.setValueAtTime(tensionNodes.noiseGain.gain.value, t);
-          tensionNodes.noiseGain.gain.linearRampToValueAtTime(0, t + 0.12);
-        }
-        if (tensionNodes.shepardGains) {
-          tensionNodes.shepardGains.forEach(function (g) {
-            g.gain.cancelScheduledValues(t);
-            g.gain.setValueAtTime(g.gain.value, t);
-            g.gain.linearRampToValueAtTime(0, t + 0.12);
-          });
+        if (gameBedNodes.master) {
+          gameBedNodes.master.gain.cancelScheduledValues(t);
+          gameBedNodes.master.gain.setValueAtTime(gameBedNodes.master.gain.value, t);
+          gameBedNodes.master.gain.linearRampToValueAtTime(0, t + 0.35);
         }
       } catch (e) {}
 
       setTimeout(function () {
-        if (!tensionNodes) return;
+        if (!gameBedNodes) return;
         try {
-          if (tensionNodes.drone) tensionNodes.drone.stop();
-          if (tensionNodes.sub) tensionNodes.sub.stop();
-          if (tensionNodes.shepardOscs) {
-            tensionNodes.shepardOscs.forEach(function (osc) {
+          if (gameBedNodes.oscs) {
+            gameBedNodes.oscs.forEach(function (osc) {
               try { osc.stop(); } catch (e) {}
             });
           }
-          if (tensionNodes.ambientOscs) {
-            tensionNodes.ambientOscs.forEach(function (osc) {
-              try { osc.stop(); } catch (e) {}
+          if (gameBedNodes.noiseBed) {
+            try { gameBedNodes.noiseBed.stop(); } catch (e) {}
+          }
+          if (gameBedNodes.lfos) {
+            gameBedNodes.lfos.forEach(function (lfo) {
+              try { lfo.stop(); } catch (e) {}
             });
-          }
-          if (tensionNodes.noiseBed) {
-            try { tensionNodes.noiseBed.stop(); } catch (e) {}
-          }
-          if (tensionNodes.warpLfo) {
-            try { tensionNodes.warpLfo.stop(); } catch (e) {}
           }
         } catch (e) {}
-        tensionNodes = null;
-      }, 180);
+        gameBedNodes = null;
+      }, 400);
+    }
+
+    function setGameBedIntensity(roundIndex, phase) {
+      if (!gameBedNodes || !audioCtx || !gameBedActive) return;
+
+      var profile = getTensionProfile(roundIndex);
+      var p = profile.intensity;
+      var t = audioCtx.currentTime;
+      var ramp = phase === 'wait' ? 0.55 : 1.1;
+      var playMul = 0.5 + p * 0.42;
+      var waitMul = 0.95 + p * 0.75;
+      var mul = phase === 'wait' ? waitMul : playMul;
+
+      gameBedNodes.master.gain.linearRampToValueAtTime(0.16 + p * 0.22 * mul, t + ramp);
+      gameBedNodes.droneGain.gain.linearRampToValueAtTime(profile.droneGainPeak * 0.42 * mul, t + ramp);
+      gameBedNodes.subGain.gain.linearRampToValueAtTime(profile.subGainPeak * 0.55 * mul, t + ramp);
+      gameBedNodes.ambientGain.gain.linearRampToValueAtTime(profile.ambientGainPeak * 1.15 * mul, t + ramp);
+      gameBedNodes.noiseGain.gain.linearRampToValueAtTime(profile.noiseBedPeak * 1.2 * mul, t + ramp);
+      gameBedNodes.shepardMaster.gain.linearRampToValueAtTime(profile.shepardGainPeak * 0.75 * mul, t + ramp);
+
+      gameBedNodes.drone.frequency.linearRampToValueAtTime(profile.droneFreqStart, t + ramp);
+      gameBedNodes.drone.frequency.linearRampToValueAtTime(
+        profile.droneFreqEnd * (phase === 'wait' ? 1.05 : 0.92),
+        t + ramp + 1.8
+      );
+    }
+
+    function dipGameBedForSignal() {
+      if (!gameBedNodes || !audioCtx) return;
+      var t = audioCtx.currentTime;
+      var profile = getTensionProfile(gameState.round);
+      var p = profile.intensity;
+      gameBedWaitMode = false;
+
+      gameBedNodes.master.gain.cancelScheduledValues(t);
+      gameBedNodes.master.gain.setValueAtTime(gameBedNodes.master.gain.value, t);
+      gameBedNodes.master.gain.linearRampToValueAtTime(0.025, t + 0.1);
+      gameBedNodes.master.gain.linearRampToValueAtTime(0.14 + p * 0.18, t + 0.32);
+    }
+
+    function startGameBed() {
+      stopGameBed();
+
+      return initAudio().then(function (ctx) {
+        if (ctx.state === 'suspended') {
+          return ctx.resume().then(function () { return ctx; });
+        }
+        return ctx;
+      }).then(function (ctx) {
+        gameBedActive = true;
+        var t = ctx.currentTime;
+        var end = t + GAME_BED_DURATION_SEC;
+        var oscs = [];
+        var lfos = [];
+
+        var master = ctx.createGain();
+        master.gain.setValueAtTime(0, t);
+        master.gain.linearRampToValueAtTime(0.12, t + 1.4);
+        master.connect(ctx.destination);
+
+        // Drone subsónico continuo
+        var drone = ctx.createOscillator();
+        var droneGain = ctx.createGain();
+        var droneFilter = ctx.createBiquadFilter();
+        var droneLfo = ctx.createOscillator();
+        var droneLfoGain = ctx.createGain();
+        drone.type = 'sine';
+        drone.frequency.setValueAtTime(50, t);
+        droneFilter.type = 'lowpass';
+        droneFilter.frequency.value = 220;
+        droneLfo.type = 'sine';
+        droneLfo.frequency.value = 0.09;
+        droneLfoGain.gain.value = 0.018;
+        droneGain.gain.value = 0.04;
+        droneLfo.connect(droneLfoGain);
+        droneLfoGain.connect(droneGain.gain);
+        drone.connect(droneFilter);
+        droneFilter.connect(droneGain);
+        droneGain.connect(master);
+        drone.start(t);
+        drone.stop(end);
+        droneLfo.start(t);
+        droneLfo.stop(end);
+        oscs.push(drone);
+        lfos.push(droneLfo);
+
+        // Armónico de refuerzo
+        var sub = ctx.createOscillator();
+        var subGain = ctx.createGain();
+        sub.type = 'triangle';
+        sub.frequency.value = 100;
+        subGain.gain.value = 0.022;
+        sub.connect(subGain);
+        subGain.connect(master);
+        sub.start(t);
+        sub.stop(end);
+        oscs.push(sub);
+
+        // Ambiente estéreo envolvente
+        var ambientGain = ctx.createGain();
+        var ambientFilter = ctx.createBiquadFilter();
+        ambientFilter.type = 'lowpass';
+        ambientFilter.frequency.value = 420;
+        ambientGain.gain.value = 0.01;
+        [
+          { freq: 80, pan: -0.55 },
+          { freq: 81.6, pan: 0.55 }
+        ].forEach(function (cfg) {
+          var amb = ctx.createOscillator();
+          var ambPan = ctx.createStereoPanner();
+          amb.type = 'sine';
+          amb.frequency.value = cfg.freq;
+          ambPan.pan.value = cfg.pan;
+          amb.connect(ambPan);
+          ambPan.connect(ambientFilter);
+          amb.start(t);
+          amb.stop(end);
+          oscs.push(amb);
+        });
+        ambientFilter.connect(ambientGain);
+        ambientGain.connect(master);
+
+        // Ruido de sala en loop
+        var noiseLen = ctx.sampleRate * 2;
+        var noiseBuffer = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
+        var noiseData = noiseBuffer.getChannelData(0);
+        for (var i = 0; i < noiseLen; i++) {
+          noiseData[i] = (Math.random() * 2 - 1) * 0.5;
+        }
+        var noiseBed = ctx.createBufferSource();
+        noiseBed.buffer = noiseBuffer;
+        noiseBed.loop = true;
+        var noiseFilter = ctx.createBiquadFilter();
+        var noiseGain = ctx.createGain();
+        var noiseLfo = ctx.createOscillator();
+        var noiseLfoGain = ctx.createGain();
+        noiseFilter.type = 'lowpass';
+        noiseFilter.frequency.value = 280;
+        noiseGain.gain.value = 0.006;
+        noiseLfo.type = 'sine';
+        noiseLfo.frequency.value = 0.16;
+        noiseLfoGain.gain.value = 90;
+        noiseLfo.connect(noiseLfoGain);
+        noiseLfoGain.connect(noiseFilter.frequency);
+        noiseBed.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(master);
+        noiseBed.start(t);
+        noiseBed.stop(end);
+        noiseLfo.start(t);
+        noiseLfo.stop(end);
+        lfos.push(noiseLfo);
+
+        // Shepard continuo — tensión musical que nunca resuelve
+        var shepardMaster = ctx.createGain();
+        var shepardFilter = ctx.createBiquadFilter();
+        shepardFilter.type = 'lowpass';
+        shepardFilter.frequency.value = 1100;
+        shepardMaster.gain.value = 0.014;
+        for (var v = 0; v < 4; v++) {
+          var shepardOsc = ctx.createOscillator();
+          var shepardGain = ctx.createGain();
+          var shepardPan = ctx.createStereoPanner();
+          var startFreq = 108 * Math.pow(2, v);
+          shepardOsc.type = 'sine';
+          shepardOsc.frequency.setValueAtTime(startFreq, t);
+          shepardOsc.frequency.exponentialRampToValueAtTime(startFreq * 1.85, t + 14);
+          shepardGain.gain.value = 0.08 + (v % 2) * 0.04;
+          shepardPan.pan.value = (v - 1.5) * 0.35;
+          shepardOsc.connect(shepardGain);
+          shepardGain.connect(shepardPan);
+          shepardPan.connect(shepardMaster);
+          shepardOsc.start(t);
+          shepardOsc.stop(end);
+          oscs.push(shepardOsc);
+        }
+        shepardMaster.connect(shepardFilter);
+        shepardFilter.connect(master);
+
+        gameBedNodes = {
+          master: master,
+          drone: drone,
+          droneGain: droneGain,
+          sub: sub,
+          subGain: subGain,
+          ambientGain: ambientGain,
+          noiseGain: noiseGain,
+          noiseBed: noiseBed,
+          shepardMaster: shepardMaster,
+          oscs: oscs,
+          lfos: lfos
+        };
+
+        setGameBedIntensity(0, 'play');
+      }).catch(function () { /* audio no disponible */ });
+    }
+
+    function stopTensionAudio() {
+      tensionActive = false;
+      gameBedWaitMode = false;
+
+      if (tensionPulseTimer) {
+        clearTimeout(tensionPulseTimer);
+        tensionPulseTimer = null;
+      }
+
+      if (gameBedActive && gameBedNodes) {
+        setGameBedIntensity(gameState.round, 'play');
+      }
     }
 
     function startTensionAudio(totalDelayMs, roundIndex) {
-      stopTensionAudio();
-      if (!audioCtx) return;
-      if (audioCtx.state === 'suspended') return;
+      if (!gameBedActive) {
+        startGameBed().then(function () {
+          startTensionAudio(totalDelayMs, roundIndex);
+        });
+        return;
+      }
+      if (!audioCtx || audioCtx.state === 'suspended') return;
 
+      stopTensionAudio();
       tensionActive = true;
-      var ctx = audioCtx;
-      var t = ctx.currentTime;
-      var dur = totalDelayMs / 1000;
+      gameBedWaitMode = true;
+
       var profile = getTensionProfile(roundIndex || 0);
+      var dur = totalDelayMs / 1000;
       var silenceCutoff = dur - profile.silenceSec;
       var riseEnd = dur * 0.85;
       var intensity = profile.intensity;
-
-      var tensionMaster = ctx.createGain();
-      tensionMaster.gain.setValueAtTime(0.92 + intensity * 0.08, t);
-      tensionMaster.connect(ctx.destination);
-
-      // ── CAPA 1: Drone subsónico — más grave y fuerte en rondas altas ──
-      var drone = ctx.createOscillator();
-      var droneGain = ctx.createGain();
-      var droneFilter = ctx.createBiquadFilter();
-      var droneDelay = ctx.createDelay(0.15);
-      var droneDelayGain = ctx.createGain();
-      var droneMerge = ctx.createGain();
-
-      drone.type = 'sine';
-      drone.frequency.setValueAtTime(profile.droneFreqStart, t);
-      drone.frequency.linearRampToValueAtTime(profile.droneFreqEnd, t + riseEnd);
-
-      droneFilter.type = 'lowpass';
-      droneFilter.frequency.setValueAtTime(180 + intensity * 80, t);
-      droneFilter.frequency.linearRampToValueAtTime(260 + intensity * 140, t + riseEnd);
-
-      droneGain.gain.setValueAtTime(0, t);
-      droneGain.gain.linearRampToValueAtTime(profile.droneGainStart, t + 0.35);
-      droneGain.gain.linearRampToValueAtTime(profile.droneGainPeak, t + dur * 0.78);
-      droneGain.gain.linearRampToValueAtTime(0, t + silenceCutoff);
-
-      droneDelay.delayTime.value = 0.07 + intensity * 0.04;
-      droneDelayGain.gain.value = 0.22 + intensity * 0.18;
-
-      drone.connect(droneFilter);
-      droneFilter.connect(droneGain);
-      droneGain.connect(droneMerge);
-      droneGain.connect(droneDelay);
-      droneDelay.connect(droneDelayGain);
-      droneDelayGain.connect(droneMerge);
-      droneMerge.connect(tensionMaster);
-      drone.start(t);
-      drone.stop(t + dur + 0.1);
-
-      // ── CAPA 2: Armónico de refuerzo ──
-      var sub = ctx.createOscillator();
-      var subGain = ctx.createGain();
-      var subPan = ctx.createStereoPanner();
-
-      sub.type = 'triangle';
-      sub.frequency.setValueAtTime(108 + intensity * 8, t);
-      sub.frequency.linearRampToValueAtTime(132 + intensity * 28, t + riseEnd);
-
-      subGain.gain.setValueAtTime(0, t);
-      subGain.gain.linearRampToValueAtTime(profile.subGainPeak * 0.65, t + 0.55);
-      subGain.gain.linearRampToValueAtTime(profile.subGainPeak, t + dur * 0.76);
-      subGain.gain.linearRampToValueAtTime(0, t + silenceCutoff);
-
-      subPan.pan.value = 0;
-      sub.connect(subGain);
-      subGain.connect(subPan);
-      subPan.connect(tensionMaster);
-      sub.start(t);
-      sub.stop(t + dur + 0.1);
-
-      // ── CAPA 5: Ambiente estéreo envolvente (batimiento L/R) ──
-      var ambientOscs = [];
-      var ambientGain = ctx.createGain();
-      var ambientFilter = ctx.createBiquadFilter();
       var panSpread = profile.panSpread;
-
-      ambientFilter.type = 'lowpass';
-      ambientFilter.frequency.setValueAtTime(320 + intensity * 120, t);
-      ambientFilter.frequency.linearRampToValueAtTime(520 + intensity * 380, t + riseEnd);
-      ambientFilter.Q.value = 0.7;
-
-      ambientGain.gain.setValueAtTime(0, t);
-      ambientGain.gain.linearRampToValueAtTime(profile.ambientGainPeak * 0.6, t + 0.5);
-      ambientGain.gain.linearRampToValueAtTime(profile.ambientGainPeak, t + dur * 0.7);
-      ambientGain.gain.linearRampToValueAtTime(0, t + silenceCutoff);
-
-      [
-        { freq: 82, pan: -panSpread },
-        { freq: 83.4 + intensity * 1.2, pan: panSpread }
-      ].forEach(function (cfg) {
-        var amb = ctx.createOscillator();
-        var ambPan = ctx.createStereoPanner();
-        amb.type = 'sine';
-        amb.frequency.setValueAtTime(cfg.freq, t);
-        amb.frequency.linearRampToValueAtTime(cfg.freq + 6 + intensity * 14, t + riseEnd);
-        ambPan.pan.value = cfg.pan;
-        amb.connect(ambPan);
-        ambPan.connect(ambientFilter);
-        amb.start(t);
-        amb.stop(t + dur + 0.1);
-        ambientOscs.push(amb);
-      });
-
-      ambientFilter.connect(ambientGain);
-      ambientGain.connect(tensionMaster);
-
-      // ── CAPA 6: Lecho de ruido que crece — sensación de presión en la sala ──
-      var noiseLen = Math.max(1, Math.ceil(ctx.sampleRate * dur));
-      var noiseBuffer = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
-      var noiseData = noiseBuffer.getChannelData(0);
-      for (var n = 0; n < noiseLen; n++) {
-        noiseData[n] = (Math.random() * 2 - 1) * 0.55;
-      }
-      var noiseBed = ctx.createBufferSource();
-      noiseBed.buffer = noiseBuffer;
-      noiseBed.loop = false;
-      var noiseFilter = ctx.createBiquadFilter();
-      var noiseGain = ctx.createGain();
-      var warpLfo = ctx.createOscillator();
-      var warpLfoGain = ctx.createGain();
-
-      noiseFilter.type = 'lowpass';
-      noiseFilter.frequency.setValueAtTime(180 + intensity * 60, t);
-      noiseFilter.frequency.linearRampToValueAtTime(420 + intensity * 520, t + riseEnd);
-      noiseGain.gain.setValueAtTime(0, t);
-      noiseGain.gain.linearRampToValueAtTime(profile.noiseBedPeak * 0.5, t + 0.45);
-      noiseGain.gain.linearRampToValueAtTime(profile.noiseBedPeak, t + dur * 0.72);
-      noiseGain.gain.linearRampToValueAtTime(0, t + silenceCutoff);
-
-      warpLfo.type = 'sine';
-      warpLfo.frequency.value = 0.12 + intensity * 0.22;
-      warpLfoGain.gain.value = 40 + intensity * 90;
-      warpLfo.connect(warpLfoGain);
-      warpLfoGain.connect(noiseFilter.frequency);
-      warpLfo.start(t);
-      warpLfo.stop(t + dur + 0.1);
-
-      noiseBed.connect(noiseFilter);
-      noiseFilter.connect(noiseGain);
-      noiseGain.connect(tensionMaster);
-      noiseBed.start(t);
-      noiseBed.stop(t + dur + 0.1);
-
-      // ── CAPA 4: Shepard tone — más denso en rondas altas ──
-      var shepardOscs = [];
-      var shepardGains = [];
-      var shepardMaster = ctx.createGain();
-      var shepardFilter = ctx.createBiquadFilter();
-      var numShepardVoices = 4 + Math.round(intensity * 2);
-      var curveSteps = Math.max(64, Math.floor(dur * 50));
-
-      shepardFilter.type = 'lowpass';
-      shepardFilter.frequency.setValueAtTime(800 + intensity * 200, t);
-      shepardFilter.frequency.linearRampToValueAtTime(profile.shepardFilterEnd, t + riseEnd);
-      shepardFilter.Q.value = 0.55 + intensity * 0.25;
-
-      shepardMaster.gain.setValueAtTime(0, t);
-      shepardMaster.gain.linearRampToValueAtTime(profile.shepardGainMid, t + 0.5);
-      shepardMaster.gain.linearRampToValueAtTime(profile.shepardGainPeak, t + dur * 0.7);
-      shepardMaster.gain.linearRampToValueAtTime(0, t + silenceCutoff);
-
-      for (var v = 0; v < numShepardVoices; v++) {
-        var shepardOsc = ctx.createOscillator();
-        var shepardGain = ctx.createGain();
-        var shepardPan = ctx.createStereoPanner();
-        var startFreq = (100 + intensity * 18) * Math.pow(2, v);
-
-        shepardOsc.type = 'sine';
-        shepardOsc.frequency.setValueAtTime(startFreq, t);
-        shepardOsc.frequency.exponentialRampToValueAtTime(startFreq * (1.85 + intensity * 0.25), t + riseEnd);
-
-        var gainCurve = new Float32Array(curveSteps);
-        var shepardAmp = 0.26 + intensity * 0.12;
-        for (var s = 0; s < curveSteps; s++) {
-          var phase = ((s / curveSteps) * (1.6 + intensity * 0.35) + v / numShepardVoices) % 1;
-          gainCurve[s] = Math.pow(Math.sin(phase * Math.PI), 1.25 + intensity * 0.2) * shepardAmp;
-        }
-
-        shepardGain.gain.setValueAtTime(0.001, t);
-        shepardGain.gain.setValueCurveAtTime(gainCurve, t, riseEnd);
-        shepardGain.gain.linearRampToValueAtTime(0, t + silenceCutoff);
-
-        shepardPan.pan.value = (v / Math.max(1, numShepardVoices - 1) - 0.5) * panSpread * 1.4;
-        shepardOsc.connect(shepardGain);
-        shepardGain.connect(shepardPan);
-        shepardPan.connect(shepardMaster);
-        shepardOsc.start(t);
-        shepardOsc.stop(t + dur + 0.1);
-        shepardOscs.push(shepardOsc);
-        shepardGains.push(shepardGain);
-      }
-
-      shepardMaster.connect(shepardFilter);
-      shepardFilter.connect(tensionMaster);
-
-      tensionNodes = {
-        master: tensionMaster,
-        drone: drone,
-        droneGain: droneGain,
-        sub: sub,
-        subGain: subGain,
-        shepardOscs: shepardOscs,
-        shepardGains: shepardGains,
-        shepardMaster: shepardMaster,
-        ambientOscs: ambientOscs,
-        ambientGain: ambientGain,
-        noiseBed: noiseBed,
-        noiseGain: noiseGain,
-        warpLfo: warpLfo
-      };
-
-      // ── CAPA 3: Pulso cardíaco — BPM y volumen escalan con la ronda ──
       var bpm = profile.bpmStart;
       var bpmTarget = profile.bpmTarget;
       var elapsed = 0;
-      var silenceZone = silenceCutoff;
+
+      setGameBedIntensity(roundIndex || 0, 'wait');
+
+      if (gameBedNodes && audioCtx) {
+        var t = audioCtx.currentTime;
+        gameBedNodes.master.gain.linearRampToValueAtTime(0.001, t + silenceCutoff);
+      }
 
       function schedulePulse() {
-        if (!tensionActive) return;
-        if (elapsed >= silenceZone) return;
+        if (!tensionActive || !gameBedWaitMode) return;
+        if (elapsed >= silenceCutoff) return;
 
         var progress = Math.min(elapsed / riseEnd, 1);
         var currentBpm = bpm + Math.pow(progress, profile.pulseExponent) * (bpmTarget - bpm);
         var intervalMs = (60 / currentBpm) * 1000;
-        var localIntensity = intensity + progress * 0.35;
 
         initAudio().then(function (pulseCtx) {
-          if (!tensionActive) return;
+          if (!tensionActive || !gameBedWaitMode) return;
           try {
             var tickOsc = pulseCtx.createOscillator();
             var tickGain = pulseCtx.createGain();
             var tickFilter = pulseCtx.createBiquadFilter();
             var tickPan = pulseCtx.createStereoPanner();
+            var bedDest = gameBedNodes && gameBedNodes.master
+              ? gameBedNodes.master
+              : pulseCtx.destination;
 
             tickOsc.type = 'sine';
             tickOsc.frequency.value =
-              profile.tickFreqBase + progress * profile.tickFreqRange + localIntensity * 40;
+              profile.tickFreqBase + progress * profile.tickFreqRange + intensity * 40;
 
             tickFilter.type = 'bandpass';
-            tickFilter.frequency.value = 260 + localIntensity * 120 + progress * 180;
-            tickFilter.Q.value = 1.6 + localIntensity * 0.8;
+            tickFilter.frequency.value = 260 + intensity * 120 + progress * 180;
+            tickFilter.Q.value = 1.6 + intensity * 0.8;
 
             var vol = profile.pulseVolBase + progress * profile.pulseVolRange;
             tickPan.pan.value = (Math.random() - 0.5) * panSpread * 0.6;
@@ -4390,7 +4382,7 @@
             tickOsc.connect(tickFilter);
             tickFilter.connect(tickGain);
             tickGain.connect(tickPan);
-            tickPan.connect(pulseCtx.destination);
+            tickPan.connect(bedDest);
             tickOsc.start(pulseCtx.currentTime);
             tickOsc.stop(pulseCtx.currentTime + 0.075);
           } catch (e) {}
@@ -4589,8 +4581,9 @@
     function activateSignal() {
       if (gameState.gameOver || roundResolving) return;
 
-      // Corta la tensión — el silencio ya estaba programado, esto es el refuerzo
+      // Corta el refuerzo de espera y dip breve para que el Neon Impact golpee más fuerte
       stopTensionAudio();
+      dipGameBedForSignal();
 
       currentSignalDurationMs = getSignalDurationMs(gameState.round);
       gameState.roundClicks = 0;
@@ -4658,6 +4651,9 @@
       if (tapWindowTimer) { clearTimeout(tapWindowTimer); tapWindowTimer = null; }
 
       gameState.round++;
+      if (gameBedActive) {
+        setGameBedIntensity(gameState.round, 'play');
+      }
       const clicks = gameState.roundClicks;
       const grade = feedbackGrade(clicks);
 
@@ -4816,7 +4812,13 @@
 
       gameElapsedInterval = setInterval(updateGameUI, 500);
 
-      startRound();
+      initAudio().then(function () {
+        return startGameBed();
+      }).then(function () {
+        startRound();
+      }).catch(function () {
+        startRound();
+      });
     }
 
     function stopGame() {
@@ -4824,6 +4826,7 @@
       roundResolving = false;
       gameState.waitingForTap = false;
       clearGameTimers();
+      stopGameBed();
       stopWave();
     }
 
