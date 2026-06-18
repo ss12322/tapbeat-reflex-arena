@@ -224,10 +224,20 @@
   async function approveTokenIfNeeded(tokenKey, amountWei) {
     if (!state.signer || amountWei === BigInt(0)) return;
     var token = cfg.tokens[tokenKey];
+    if (!token) throw new Error('Token no configurado: ' + tokenKey);
     var erc20 = new global.ethers.Contract(token.address, [
       'function allowance(address,address) view returns (uint256)',
-      'function approve(address,uint256) returns (bool)'
+      'function approve(address,uint256) returns (bool)',
+      'function balanceOf(address) view returns (uint256)'
     ], state.signer);
+    var balance = await erc20.balanceOf(state.wallet);
+    if (balance < amountWei) {
+      var sym = token.symbol || tokenKey;
+      throw new Error(
+        'Saldo insuficiente de ' + sym + ' en Celo Sepolia. ' +
+        'Usa el botón + $1 ' + sym + ' solo si tienes ese token en la wallet.'
+      );
+    }
     var allowance = await erc20.allowance(state.wallet, cfg.contractAddress);
     if (allowance >= amountWei) return;
     var tx = await erc20.approve(cfg.contractAddress, amountWei);

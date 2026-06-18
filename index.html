@@ -5217,7 +5217,7 @@
         }
         await TapBeatChain.sponsorPool(usdAmount, tokenKey);
         await syncTournamentFromChain();
-        alert('+$' + usdAmount + ' ' + tokenKey + ' añadidos al pool del torneo actual.');
+        alert('+$' + usdAmount + ' ' + (labels[tokenKey] || tokenKey) + ' añadidos al pool del torneo actual.');
       } catch (err) {
         console.error('TapBeat: sponsor pool', err);
         alert(friendlyChainError(err));
