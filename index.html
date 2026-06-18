@@ -2554,16 +2554,18 @@
           <span class="wallet-demo" id="wallet-demo-badge" hidden>Modo demo</span>
         </div>
         <div class="token-select" id="token-select">
-          <button type="button" class="active" data-token="USDm">cUSD</button>
+          <button type="button" data-token="USDm">cUSD</button>
           <button type="button" data-token="USDT">USDT</button>
+          <button type="button" class="active" data-token="USDC">USDC</button>
         </div>
         <button class="btn btn-primary btn-lg btn-block" id="btn-join-tournament">
           UNIRSE AL TORNEO
         </button>
-        <span class="entry-fee-hint" id="entry-fee-hint">Entrada <strong>$0.25</strong> · paga con cUSD o USDT</span>
+        <span class="entry-fee-hint" id="entry-fee-hint">Entrada <strong>$0.25</strong> · cUSD, USDT o USDC</span>
         <div class="admin-pool-panel" id="admin-pool-panel" hidden>
           <span class="admin-pool-label">Admin · patrocinar pool (testnet)</span>
           <div class="admin-pool-actions">
+            <button type="button" class="btn btn-primary" id="btn-sponsor-usdc-1">+ $1 USDC</button>
             <button type="button" class="btn btn-secondary" id="btn-sponsor-usdt-1">+ $1 USDT</button>
             <button type="button" class="btn btn-secondary" id="btn-sponsor-cusd-1">+ $1 cUSD</button>
           </div>
@@ -5166,7 +5168,7 @@
         var chainState = TapBeatChain.getState();
         if (chainState.hasFreePlay) {
           feeHint.innerHTML = 'Tu <strong>primera entrada es GRATIS</strong> · luego $' +
-            TapBeatChain.getEntryFeeUsd().toFixed(2) + ' con cUSD o USDT';
+            TapBeatChain.getEntryFeeUsd().toFixed(2) + ' con cUSD, USDT o USDC';
         } else {
           feeHint.innerHTML = 'Entrada <strong>$' + TapBeatChain.getEntryFeeUsd().toFixed(2) +
             '</strong> · mín. 10 jugadores o reembolso automático';
@@ -5196,7 +5198,13 @@
     }
 
     async function runSponsorPool(usdAmount, tokenKey) {
-      var btnId = tokenKey === 'USDT' ? 'btn-sponsor-usdt-1' : 'btn-sponsor-cusd-1';
+      var btnIds = {
+        USDC: 'btn-sponsor-usdc-1',
+        USDT: 'btn-sponsor-usdt-1',
+        USDm: 'btn-sponsor-cusd-1'
+      };
+      var labels = { USDC: 'USDC', USDT: 'USDT', USDm: 'cUSD' };
+      var btnId = btnIds[tokenKey] || btnIds.USDC;
       var btn = document.getElementById(btnId);
       if (btn) {
         btn.disabled = true;
@@ -5214,9 +5222,10 @@
         console.error('TapBeat: sponsor pool', err);
         alert(friendlyChainError(err));
       } finally {
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = '+ $' + usdAmount + ' ' + (tokenKey === 'USDT' ? 'USDT' : 'cUSD');
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '+ $' + usdAmount + ' ' + (labels[tokenKey] || tokenKey);
+        }
       }
     }
 
@@ -5225,11 +5234,13 @@
       if (msg.indexOf('not exists') >= 0) {
         return 'El torneo de esta hora no existía on-chain. Se intentó crear; recarga e inténtalo de nuevo.';
       }
+      if (msg.indexOf('exceeds balance') >= 0) {
+        return 'No tienes suficiente saldo de ese token en Celo Sepolia. Prueba + $1 USDC si tienes USDC del faucet.';
+      }
       if (msg.indexOf('insufficient funds') >= 0 || msg.indexOf('transfer failed') >= 0) {
-        return 'No tienes suficiente cUSD/USDT o CELO para gas en Celo Sepolia.';
+        return 'No tienes suficiente cUSD/USDT/USDC o CELO para gas en Celo Sepolia.';
       }
       return msg;
-    }
     }
 
     async function recordTournamentEntry(joinResult) {
@@ -5633,7 +5644,7 @@
         items.push('🎮 Sé el primero en unirte — entrada gratis la 1ª vez');
       }
 
-      items.push('🎁 Admin puede patrocinar el pool con USDT/cUSD de testnet');
+      items.push('🎁 Admin puede patrocinar el pool con USDC, USDT o cUSD de testnet');
 
       if (entries && entries.length) {
         entries.forEach(function (row) {
@@ -5764,8 +5775,14 @@
         });
       }
 
+      var sponsorUsdc = document.getElementById('btn-sponsor-usdc-1');
       var sponsorUsdt = document.getElementById('btn-sponsor-usdt-1');
       var sponsorCusd = document.getElementById('btn-sponsor-cusd-1');
+      if (sponsorUsdc) {
+        sponsorUsdc.addEventListener('click', function () {
+          runSponsorPool(1, 'USDC');
+        });
+      }
       if (sponsorUsdt) {
         sponsorUsdt.addEventListener('click', function () {
           runSponsorPool(1, 'USDT');

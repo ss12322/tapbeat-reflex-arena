@@ -7,11 +7,12 @@ interface IERC20 {
     function balanceOf(address account) external view returns (uint256);
 }
 
-/// @title TapBeat hourly tournament — cUSD (USDm) + USDT on Celo Sepolia / Mainnet
+/// @title TapBeat hourly tournament — cUSD (USDm) + USDT + USDC on Celo Sepolia / Mainnet
 /// @notice Min 10 players to run; auto-refund if cancelled; first entry free per wallet
 contract TapBeatTournament {
     IERC20 public immutable usdm;
     IERC20 public immutable usdt;
+    IERC20 public immutable usdc;
 
     address public owner;
     address public oracle;
@@ -22,12 +23,12 @@ contract TapBeatTournament {
     uint256 public constant BPS_SECOND = 2400;
     uint256 public constant BPS_THIRD = 1600;
 
-    uint256 public constant FEE_BASIC_USD6 = 250_000;    // $0.25
-    uint256 public constant FEE_STANDARD_USD6 = 500_000; // $0.50
-    uint256 public constant FEE_PREMIUM_USD6 = 1_000_000; // $1.00
-    uint256 public constant FEE_ELITE_USD6 = 2_000_000;  // $2.00
+    uint256 public constant FEE_BASIC_USD6 = 250_000;
+    uint256 public constant FEE_STANDARD_USD6 = 500_000;
+    uint256 public constant FEE_PREMIUM_USD6 = 1_000_000;
+    uint256 public constant FEE_ELITE_USD6 = 2_000_000;
 
-    enum Token { USDm, USDT }
+    enum Token { USDm, USDT, USDC }
     enum Tier { Free, Basic, Standard, Premium, Elite }
     enum Status { OPEN, LOCKED, FINALIZED, CANCELLED }
 
@@ -45,6 +46,7 @@ contract TapBeatTournament {
         address[] players;
         uint256 usdmPool;
         uint256 usdtPool;
+        uint256 usdcPool;
         uint256 prizePoolUsd6;
     }
 
@@ -83,10 +85,11 @@ contract TapBeatTournament {
         _;
     }
 
-    constructor(address usdm_, address usdt_, address oracle_) {
-        require(usdm_ != address(0) && usdt_ != address(0), "TapBeat: zero token");
+    constructor(address usdm_, address usdt_, address usdc_, address oracle_) {
+        require(usdm_ != address(0) && usdt_ != address(0) && usdc_ != address(0), "TapBeat: zero token");
         usdm = IERC20(usdm_);
         usdt = IERC20(usdt_);
+        usdc = IERC20(usdc_);
         owner = msg.sender;
         oracle = oracle_;
     }
@@ -110,14 +113,35 @@ contract TapBeatTournament {
 
     function tokenAmountForFee(Token token, uint256 usd6) public pure returns (uint256) {
         if (usd6 == 0) return 0;
-        if (token == Token.USDm) return usd6 * 1e12; // 6 -> 18 decimals
-        return usd6; // USDT 6 decimals
+        if (token == Token.USDm) return usd6 * 1e12;
+        return usd6;
     }
 
     function usd6FromAmount(Token token, uint256 amount) public pure returns (uint256) {
         if (amount == 0) return 0;
         if (token == Token.USDm) return amount / 1e12;
         return amount;
+    }
+
+    function _payToken(Token token) internal view returns (IERC20) {
+        if (token == Token.USDm) return usdm;
+        if (token == Token.USDT) return usdt;
+        return usdc;
+    }
+
+    function _creditPool(Tournament storage t, Token token, uint256 amount) internal {
+        uint256 usd6 = usd6FromAmount(token, amount);
+        if (token == Token.USDm) t.usdmPool += amount;
+        else if (token == Token.USDT) t.usdtPool += amount;
+        else t.usdcPool += amount;
+        t.prizePoolUsd6 += usd6;
+    }
+
+    function _debitPool(Tournament storage t, Token token, uint256 amount) internal {
+        if (token == Token.USDm) t.usdmPool -= amount;
+        else if (token == Token.USDT) t.usdtPool -= amount;
+        else t.usdcPool -= amount;
+        t.prizePoolUsd6 -= usd6FromAmount(token, amount);
     }
 
     function createTournament(
@@ -151,8 +175,7 @@ contract TapBeatTournament {
             wasFree = true;
             amount = 0;
         } else if (amount > 0) {
-            IERC20 payToken = token == Token.USDm ? usdm : usdt;
-            require(payToken.transferFrom(msg.sender, address(this), amount), "TapBeat: transfer failed");
+            require(_payToken(token).transferFrom(msg.sender, address(this), amount), "TapBeat: transfer failed");
         }
 
         hasEntered[tournamentId][msg.sender] = true;
@@ -164,30 +187,22 @@ contract TapBeatTournament {
         });
 
         if (amount > 0) {
-            if (token == Token.USDm) t.usdmPool += amount;
-            else t.usdtPool += amount;
-            t.prizePoolUsd6 += usd6FromAmount(token, amount);
+            _creditPool(t, token, amount);
         }
 
         emit PlayerEntered(tournamentId, msg.sender, token, amount, wasFree);
     }
 
-    /// @notice Owner puede inyectar fondos al pool (demo / patrocinio) sin entrar al torneo
     function sponsorPool(uint256 tournamentId, Token token, uint256 amount) external onlyOwner {
         Tournament storage t = tournaments[tournamentId];
         require(t.startTime > 0, "TapBeat: not exists");
         require(t.status == Status.OPEN, "TapBeat: not open");
         require(amount > 0, "TapBeat: zero amount");
 
-        IERC20 payToken = token == Token.USDm ? usdm : usdt;
-        require(payToken.transferFrom(msg.sender, address(this), amount), "TapBeat: transfer failed");
+        require(_payToken(token).transferFrom(msg.sender, address(this), amount), "TapBeat: transfer failed");
+        _creditPool(t, token, amount);
 
-        uint256 usd6 = usd6FromAmount(token, amount);
-        if (token == Token.USDm) t.usdmPool += amount;
-        else t.usdtPool += amount;
-        t.prizePoolUsd6 += usd6;
-
-        emit PoolSponsored(tournamentId, msg.sender, token, amount, usd6);
+        emit PoolSponsored(tournamentId, msg.sender, token, amount, usd6FromAmount(token, amount));
     }
 
     function closeTournament(uint256 tournamentId) external onlyOracle {
@@ -214,13 +229,9 @@ contract TapBeatTournament {
             PlayerEntry storage entry = playerEntry[tournamentId][player];
             if (entry.refunded || entry.amount == 0) continue;
 
-            IERC20 payToken = entry.token == Token.USDm ? usdm : usdt;
             entry.refunded = true;
-            require(payToken.transfer(player, entry.amount), "TapBeat: refund failed");
-
-            if (entry.token == Token.USDm) t.usdmPool -= entry.amount;
-            else t.usdtPool -= entry.amount;
-            t.prizePoolUsd6 -= usd6FromAmount(entry.token, entry.amount);
+            require(_payToken(entry.token).transfer(player, entry.amount), "TapBeat: refund failed");
+            _debitPool(t, entry.token, entry.amount);
 
             emit PlayerRefunded(tournamentId, player, entry.token, entry.amount);
         }
@@ -238,29 +249,26 @@ contract TapBeatTournament {
         prizesUsd6[1] = (netUsd6 * BPS_SECOND) / 10_000;
         prizesUsd6[2] = (netUsd6 * BPS_THIRD) / 10_000;
 
-        _payoutUsd6(owner, creatorUsd6, t.usdmPool, t.usdtPool, t.prizePoolUsd6);
-        _payoutUsd6(winners[0], prizesUsd6[0], t.usdmPool, t.usdtPool, t.prizePoolUsd6);
-        _payoutUsd6(winners[1], prizesUsd6[1], t.usdmPool, t.usdtPool, t.prizePoolUsd6);
-        _payoutUsd6(winners[2], prizesUsd6[2], t.usdmPool, t.usdtPool, t.prizePoolUsd6);
+        _payoutUsd6(owner, creatorUsd6, t);
+        _payoutUsd6(winners[0], prizesUsd6[0], t);
+        _payoutUsd6(winners[1], prizesUsd6[1], t);
+        _payoutUsd6(winners[2], prizesUsd6[2], t);
 
         t.status = Status.FINALIZED;
         emit TournamentFinalized(tournamentId, winners, prizesUsd6);
     }
 
-    function _payoutUsd6(
-        address to,
-        uint256 shareUsd6,
-        uint256 usdmPool,
-        uint256 usdtPool,
-        uint256 totalUsd6
-    ) internal {
-        if (shareUsd6 == 0 || totalUsd6 == 0) return;
+    function _payoutUsd6(address to, uint256 shareUsd6, Tournament storage t) internal {
+        if (shareUsd6 == 0 || t.prizePoolUsd6 == 0) return;
 
-        uint256 usdmShare = (usdmPool * shareUsd6) / totalUsd6;
-        uint256 usdtShare = (usdtPool * shareUsd6) / totalUsd6;
+        uint256 total = t.prizePoolUsd6;
+        uint256 usdmShare = (t.usdmPool * shareUsd6) / total;
+        uint256 usdtShare = (t.usdtPool * shareUsd6) / total;
+        uint256 usdcShare = (t.usdcPool * shareUsd6) / total;
 
         if (usdmShare > 0) require(usdm.transfer(to, usdmShare), "TapBeat: usdm payout");
         if (usdtShare > 0) require(usdt.transfer(to, usdtShare), "TapBeat: usdt payout");
+        if (usdcShare > 0) require(usdc.transfer(to, usdcShare), "TapBeat: usdc payout");
     }
 
     function getTournament(uint256 tournamentId)
@@ -274,6 +282,7 @@ contract TapBeatTournament {
             uint256 playerCount,
             uint256 usdmPool,
             uint256 usdtPool,
+            uint256 usdcPool,
             uint256 prizePoolUsd6
         )
     {
@@ -286,6 +295,7 @@ contract TapBeatTournament {
             t.players.length,
             t.usdmPool,
             t.usdtPool,
+            t.usdcPool,
             t.prizePoolUsd6
         );
     }

@@ -49,7 +49,7 @@ async function main() {
   const oracle = process.env.TAPBEAT_ORACLE || wallet.address;
 
   console.log('Desplegando en Celo Sepolia…');
-  const contract = await factory.deploy(CHAIN.usdm, CHAIN.usdt, oracle);
+  const contract = await factory.deploy(CHAIN.usdm, CHAIN.usdt, CHAIN.usdc, oracle);
   await contract.waitForDeployment();
   const address = await contract.getAddress();
 

@@ -1,12 +1,12 @@
 /**
  * TapBeat — integración on-chain (MiniPay / Celo Sepolia)
- * Soporta cUSD (USDm) y USDT; primera entrada gratis por wallet.
+ * Soporta cUSD (USDm), USDT y USDC; primera entrada gratis por wallet.
  */
 (function (global) {
   'use strict';
 
   var cfg = global.TAPBEAT_CHAIN || {};
-  var Token = { USDm: 0, USDT: 1 };
+  var Token = { USDm: 0, USDT: 1, USDC: 2 };
 
   var state = {
     wallet: null,
@@ -14,7 +14,7 @@
     signer: null,
     contract: null,
     readContract: null,
-    selectedToken: 'USDm',
+    selectedToken: 'USDC',
     currentTournament: null,
     entered: false,
     hasFreePlay: true,
@@ -149,6 +149,12 @@
     if (cfg.tokens[tokenKey]) state.selectedToken = tokenKey;
   }
 
+  function tokenKeyToEnum(tokenKey) {
+    if (tokenKey === 'USDT') return Token.USDT;
+    if (tokenKey === 'USDC') return Token.USDC;
+    return Token.USDm;
+  }
+
   function getSelectedToken() {
     return cfg.tokens[state.selectedToken] || cfg.tokens.USDm;
   }
@@ -179,7 +185,8 @@
       playerCount: Number(t[4]),
       usdmPool: t[5],
       usdtPool: t[6],
-      prizePoolUsd6: t[7]
+      usdcPool: t[7],
+      prizePoolUsd6: t[8]
     };
   }
 
@@ -260,12 +267,12 @@
         state.contract = new global.ethers.Contract(cfg.contractAddress, cfg.abi, state.signer);
       }
       await ensureTournamentExists();
-      var tokenEnum = state.selectedToken === 'USDT' ? Token.USDT : Token.USDm;
+      var tokenEnum = tokenKeyToEnum(state.selectedToken);
       if (!isFree) {
         var usd6 = BigInt(Math.round(entryUsd * 1e6));
-        var amountWei = tokenEnum === Token.USDT
-          ? usd6
-          : usd6 * BigInt('1000000000000');
+        var amountWei = tokenEnum === Token.USDm
+          ? usd6 * BigInt('1000000000000')
+          : usd6;
         await approveTokenIfNeeded(state.selectedToken, amountWei);
       }
       var tx = await state.contract.enterTournament(win.id, tokenEnum);
@@ -291,10 +298,12 @@
   }
 
   function usdToTokenAmount(tokenKey, usdAmount) {
-    var tokenEnum = tokenKey === 'USDT' ? Token.USDT : Token.USDm;
+    var tokenEnum = tokenKeyToEnum(tokenKey);
     var usd6 = BigInt(Math.round(usdAmount * 1e6));
-    if (tokenEnum === Token.USDT) return { tokenEnum: tokenEnum, amountWei: usd6 };
-    return { tokenEnum: tokenEnum, amountWei: usd6 * BigInt('1000000000000') };
+    if (tokenEnum === Token.USDm) {
+      return { tokenEnum: tokenEnum, amountWei: usd6 * BigInt('1000000000000') };
+    }
+    return { tokenEnum: tokenEnum, amountWei: usd6 };
   }
 
   async function isContractOwner() {

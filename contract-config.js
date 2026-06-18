@@ -7,8 +7,7 @@ window.TAPBEAT_CHAIN = {
   rpcUrl: 'https://forno.celo-sepolia.celo-testnet.org',
   blockExplorer: 'https://celo-sepolia.blockscout.com',
 
-  // Vacío = modo demo (sin pago on-chain). Tras deploy, pega la dirección aquí.
-  contractAddress: '0x35545A23b77CA27524e32c5939A09B127037825B',
+  contractAddress: '0xa9074576E9FEbF6eA5e289d05840A48608F40966',
 
   tokens: {
     USDm: {
@@ -22,6 +21,12 @@ window.TAPBEAT_CHAIN = {
       decimals: 6,
       symbol: 'USDT',
       label: 'USDT'
+    },
+    USDC: {
+      address: '0x01C5C0122039549AD1493B8220cABEdD739BC44E',
+      decimals: 6,
+      symbol: 'USDC',
+      label: 'USDC'
     }
   },
 
@@ -36,13 +41,12 @@ window.TAPBEAT_CHAIN = {
 
   defaultTier: 'basic',
 
-  // ABI mínimo del contrato TapBeatTournament
   abi: [
     'function hasPlayedFree(address) view returns (bool)',
     'function hasEntered(uint256,address) view returns (bool)',
     'function feeForTier(uint8) view returns (uint256)',
     'function enterTournament(uint256 tournamentId, uint8 token)',
-    'function getTournament(uint256) view returns (uint8 tier,uint256 startTime,uint256 endTime,uint8 status,uint256 playerCount,uint256 usdmPool,uint256 usdtPool,uint256 prizePoolUsd6)',
+    'function getTournament(uint256) view returns (uint8 tier,uint256 startTime,uint256 endTime,uint8 status,uint256 playerCount,uint256 usdmPool,uint256 usdtPool,uint256 usdcPool,uint256 prizePoolUsd6)',
     'function createTournament(uint256 tournamentId,uint8 tier,uint256 startTime,uint256 endTime)',
     'function closeTournament(uint256 tournamentId)',
     'function refundAll(uint256 tournamentId)',
