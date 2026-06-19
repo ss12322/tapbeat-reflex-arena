@@ -52,6 +52,7 @@ async function resolveWinners(contract, tournamentId) {
 
 async function processPreviousHour(contract, dryRun) {
   const prev = getPreviousTournamentWindow();
+  const current = getTournamentWindow();
   const t = await contract.getTournament(prev.id);
 
   if (Number(t.startTime) === 0) {
@@ -77,11 +78,23 @@ async function processPreviousHour(contract, dryRun) {
   const newStatus = dryRun ? STATUS.LOCKED : Number(updated.status);
 
   if (newStatus === STATUS.CANCELLED || (dryRun && Number(t.playerCount) < MIN_PLAYERS)) {
-    console.log(`Torneo #${prev.id} cancelado — reembolsando…`);
+    console.log(`Torneo #${prev.id} cancelado — reembolsando entradas de jugadores…`);
     if (!dryRun) {
       const refundTx = await contract.refundAll(prev.id);
       await refundTx.wait();
       await patchTournamentStatus(prev.id, 'cancelled');
+
+      const currentT = await contract.getTournament(current.id);
+      if (Number(currentT.startTime) > 0) {
+        const afterRefund = await contract.getTournament(prev.id);
+        if (Number(afterRefund.prizePoolUsd6) > 0) {
+          console.log(`Acumulando pool patrocinado #${prev.id} → #${current.id}…`);
+          const carryTx = await contract.carryOverPool(prev.id, current.id);
+          await carryTx.wait();
+        }
+      } else {
+        console.log(`Torneo actual #${current.id} aún no existe — carryOver en el próximo cron`);
+      }
     }
     return;
   }
@@ -131,8 +144,8 @@ async function main() {
   console.log('Contrato:', address);
   if (dryRun) console.log('(dry-run — sin transacciones)\n');
 
-  await processPreviousHour(contract, dryRun);
   await ensureCurrentHour(contract, dryRun);
+  await processPreviousHour(contract, dryRun);
 
   console.log('\nCron completado.');
 }

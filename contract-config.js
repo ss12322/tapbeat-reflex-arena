@@ -7,7 +7,7 @@ window.TAPBEAT_CHAIN = {
   rpcUrl: 'https://forno.celo-sepolia.celo-testnet.org',
   blockExplorer: 'https://celo-sepolia.blockscout.com',
 
-  contractAddress: '0xD7aE62629Fc5D9dA0c93e4DeCe73858561562dB8',
+  contractAddress: '0xc6037fA0Aa893d26E9B0e2649b5651b09Df44229',
 
   tokens: {
     USDm: {
@@ -50,6 +50,7 @@ window.TAPBEAT_CHAIN = {
     'function createTournament(uint256 tournamentId,uint8 tier,uint256 startTime,uint256 endTime)',
     'function closeTournament(uint256 tournamentId)',
     'function refundAll(uint256 tournamentId)',
+    'function carryOverPool(uint256 fromId,uint256 toId)',
     'function finalizeTournament(uint256 tournamentId,address[3] winners)',
     'function sponsorPool(uint256 tournamentId,uint8 token,uint256 amount)',
     'function owner() view returns (address)',

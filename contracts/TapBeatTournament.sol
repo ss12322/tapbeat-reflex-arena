@@ -8,7 +8,7 @@ interface IERC20 {
 }
 
 /// @title TapBeat hourly tournament — cUSD (USDm) + USDT + USDC on Celo Sepolia / Mainnet
-/// @notice Min 5 players to run; auto-refund if cancelled; first entry free per wallet
+/// @notice Min 5 players to run; player fees refunded if cancelled; sponsor pool rolls to next hour
 contract TapBeatTournament {
     IERC20 public immutable usdm;
     IERC20 public immutable usdt;
@@ -73,6 +73,14 @@ contract TapBeatTournament {
         Token token,
         uint256 amount,
         uint256 usd6Added
+    );
+    event PoolCarriedOver(
+        uint256 indexed fromTournamentId,
+        uint256 indexed toTournamentId,
+        uint256 usdmAmount,
+        uint256 usdtAmount,
+        uint256 usdcAmount,
+        uint256 usd6Amount
     );
 
     modifier onlyOwner() {
@@ -235,6 +243,39 @@ contract TapBeatTournament {
 
             emit PlayerRefunded(tournamentId, player, entry.token, entry.amount);
         }
+    }
+
+    /// @notice Mueve el pool restante (p. ej. patrocinio admin) al torneo siguiente tras reembolsar jugadores.
+    function carryOverPool(uint256 fromId, uint256 toId) external onlyOracle {
+        require(fromId != toId, "TapBeat: same tournament");
+        Tournament storage fromT = tournaments[fromId];
+        Tournament storage toT = tournaments[toId];
+        require(fromT.status == Status.CANCELLED, "TapBeat: not cancelled");
+        require(toT.startTime > 0, "TapBeat: target not exists");
+        require(toT.status == Status.OPEN, "TapBeat: target not open");
+
+        for (uint256 i = 0; i < fromT.players.length; i++) {
+            PlayerEntry storage entry = playerEntry[fromId][fromT.players[i]];
+            require(entry.refunded || entry.amount == 0, "TapBeat: refunds pending");
+        }
+
+        uint256 usdmAmt = fromT.usdmPool;
+        uint256 usdtAmt = fromT.usdtPool;
+        uint256 usdcAmt = fromT.usdcPool;
+        uint256 usd6Amt = fromT.prizePoolUsd6;
+        if (usd6Amt == 0) return;
+
+        fromT.usdmPool = 0;
+        fromT.usdtPool = 0;
+        fromT.usdcPool = 0;
+        fromT.prizePoolUsd6 = 0;
+
+        toT.usdmPool += usdmAmt;
+        toT.usdtPool += usdtAmt;
+        toT.usdcPool += usdcAmt;
+        toT.prizePoolUsd6 += usd6Amt;
+
+        emit PoolCarriedOver(fromId, toId, usdmAmt, usdtAmt, usdcAmt, usd6Amt);
     }
 
     function finalizeTournament(uint256 tournamentId, address[3] calldata winners) external onlyOracle {

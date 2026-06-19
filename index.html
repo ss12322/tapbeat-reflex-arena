@@ -5179,7 +5179,7 @@
             TapBeatChain.getEntryFeeUsd().toFixed(2) + ' con cUSD, USDT o USDC';
         } else {
           feeHint.innerHTML = 'Entrada <strong>$' + TapBeatChain.getEntryFeeUsd().toFixed(2) +
-            '</strong> · mín. ' + (TapBeatChain.getConfig().minPlayers || 5) + ' jugadores o reembolso automático';
+            '</strong> · mín. ' + (TapBeatChain.getConfig().minPlayers || 5) + ' jugadores; pool admin se acumula si no corre';
         }
       }
     }
@@ -5684,7 +5684,7 @@
       } else if (tournamentPlayerCount > 0) {
         var faltan = minPlayers - tournamentPlayerCount;
         items.push(
-          '⌛ Faltan <span class="feed-money">' + faltan + '</span> jugadores para activar premios (o reembolso)'
+          '⌛ Faltan <span class="feed-money">' + faltan + '</span> jugadores · el pool patrocinado pasa a la siguiente hora'
         );
       }
 
