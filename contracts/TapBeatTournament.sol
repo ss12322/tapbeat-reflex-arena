@@ -8,7 +8,7 @@ interface IERC20 {
 }
 
 /// @title TapBeat hourly tournament — cUSD (USDm) + USDT + USDC on Celo Sepolia / Mainnet
-/// @notice Min 10 players to run; auto-refund if cancelled; first entry free per wallet
+/// @notice Min 5 players to run; auto-refund if cancelled; first entry free per wallet
 contract TapBeatTournament {
     IERC20 public immutable usdm;
     IERC20 public immutable usdt;
@@ -17,7 +17,7 @@ contract TapBeatTournament {
     address public owner;
     address public oracle;
 
-    uint256 public constant MIN_PLAYERS = 10;
+    uint256 public constant MIN_PLAYERS = 5;
     uint256 public constant CREATOR_BPS = 2000;
     uint256 public constant BPS_FIRST = 4000;
     uint256 public constant BPS_SECOND = 2400;

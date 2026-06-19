@@ -17,6 +17,7 @@ export const TOURNAMENT_ABI = [
   'function getPlayers(uint256 tournamentId) view returns (address[])'
 ];
 
+export const MIN_PLAYERS = 5;
 export const STATUS = { OPEN: 0, LOCKED: 1, FINALIZED: 2, CANCELLED: 3 };
 export const TIER_BASIC = 1;
 

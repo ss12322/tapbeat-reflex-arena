@@ -2586,7 +2586,7 @@
         <span id="online-count-val">0</span>&nbsp;jugadores en este torneo
       </div>
       <div id="tourney-countdown">⏰ Torneo cierra en <span id="tourney-countdown-val">59:59</span></div>
-      <div id="tourney-players"><strong id="tourney-player-count">0</strong> / 10 jugadores mín. · <span id="tourney-pool-hint">$0.00 cUSD pool</span></div>
+      <div id="tourney-players"><strong id="tourney-player-count">0</strong> / 5 jugadores mín. · <span id="tourney-pool-hint">$0.00 cUSD pool</span></div>
       <div id="activity-feed"></div>
 
       <div class="home-music-controls" id="home-music-controls">
@@ -5151,8 +5151,9 @@
       var poolHint = document.getElementById('tourney-pool-hint');
       if (poolHint) {
         if (tournamentPlayerCount < 1 && TapBeatChain) {
-          var minPool = TapBeatChain.computePoolUsd(10, TapBeatChain.getEntryFeeUsd()).net;
-          poolHint.textContent = 'Pool mín. $' + minPool.toFixed(2) + ' con 10 jugadores pagados';
+          var minP = TapBeatChain.getConfig().minPlayers || 5;
+          var minPool = TapBeatChain.computePoolUsd(minP, TapBeatChain.getEntryFeeUsd()).net;
+          poolHint.textContent = 'Pool mín. $' + minPool.toFixed(2) + ' con ' + minP + ' jugadores pagados';
         } else if (poolBase <= 0 && tournamentPlayerCount > 0) {
           poolHint.textContent = tournamentPlayerCount + ' inscritos · $0.00 pool (solo entradas gratis por ahora)';
         } else {
@@ -5178,7 +5179,7 @@
             TapBeatChain.getEntryFeeUsd().toFixed(2) + ' con cUSD, USDT o USDC';
         } else {
           feeHint.innerHTML = 'Entrada <strong>$' + TapBeatChain.getEntryFeeUsd().toFixed(2) +
-            '</strong> · mín. 10 jugadores o reembolso automático';
+            '</strong> · mín. ' + (TapBeatChain.getConfig().minPlayers || 5) + ' jugadores o reembolso automático';
         }
       }
     }
@@ -5635,7 +5636,7 @@
 
     function buildActivityFeedItems(entries, win) {
       var items = [];
-      var minPlayers = TapBeatChain ? TapBeatChain.getConfig().minPlayers : 10;
+      var minPlayers = TapBeatChain ? TapBeatChain.getConfig().minPlayers : 5;
 
       items.push(
         '⏰ Torneo #' + win.id + ' · cierra en <span class="feed-money">' +

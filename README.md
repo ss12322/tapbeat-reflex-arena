@@ -93,8 +93,8 @@ TapBeat soporta torneos **cada hora** con pagos en **cUSD (USDm)** o **USDT** v�
 |-------|-------|
 | Entrada básica | **$0.25** |
 | Primera jugada | **Gratis** por wallet (`hasPlayedFree`) |
-| Mínimo para correr | **10 jugadores** |
-| Si &lt; 10 | Reembolso automático on-chain |
+| Mínimo para correr | **5 jugadores** |
+| Si &lt; 5 | Reembolso automático on-chain |
 | Viral | Badge especial con **50+** jugadores |
 | Tu comisión | **20%** del pool |
 | Premios | 40% / 24% / 16% del neto |
@@ -145,8 +145,8 @@ Esto compila el contrato, lo despliega, actualiza `contract-config.js` y crea el
 El script `scripts/tournament-cron.mjs` hace:
 
 1. **Cierra** el torneo de la hora anterior (`closeTournament`).
-2. Si hay **&lt; 10 jugadores** → `refundAll` (reembolso).
-3. Si hay **≥ 10** → lee top 3 en Supabase → `finalizeTournament` (premios).
+2. Si hay **&lt; 5 jugadores** → `refundAll` (reembolso).
+3. Si hay **≥ 5** → lee top 3 en Supabase → `finalizeTournament` (premios).
 4. **Crea** el torneo de la hora actual si no existe.
 
 **Local:**

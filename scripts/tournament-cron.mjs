@@ -8,6 +8,7 @@ import {
   TOURNAMENT_ABI,
   STATUS,
   TIER_BASIC,
+  MIN_PLAYERS,
   getTournamentWindow,
   getPreviousTournamentWindow
 } from './lib/chain-config.mjs';
@@ -75,7 +76,7 @@ async function processPreviousHour(contract, dryRun) {
   const updated = dryRun ? t : await contract.getTournament(prev.id);
   const newStatus = dryRun ? STATUS.LOCKED : Number(updated.status);
 
-  if (newStatus === STATUS.CANCELLED || (dryRun && Number(t.playerCount) < 10)) {
+  if (newStatus === STATUS.CANCELLED || (dryRun && Number(t.playerCount) < MIN_PLAYERS)) {
     console.log(`Torneo #${prev.id} cancelado — reembolsando…`);
     if (!dryRun) {
       const refundTx = await contract.refundAll(prev.id);

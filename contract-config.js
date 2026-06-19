@@ -7,7 +7,7 @@ window.TAPBEAT_CHAIN = {
   rpcUrl: 'https://forno.celo-sepolia.celo-testnet.org',
   blockExplorer: 'https://celo-sepolia.blockscout.com',
 
-  contractAddress: '0xa9074576E9FEbF6eA5e289d05840A48608F40966',
+  contractAddress: '0xD7aE62629Fc5D9dA0c93e4DeCe73858561562dB8',
 
   tokens: {
     USDm: {
@@ -30,7 +30,7 @@ window.TAPBEAT_CHAIN = {
     }
   },
 
-  minPlayers: 10,
+  minPlayers: 5,
   viralThreshold: 50,
   creatorBps: 2000,
   prizeSplits: { first: 0.40, second: 0.24, third: 0.16, creator: 0.20 },
